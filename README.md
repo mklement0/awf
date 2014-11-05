@@ -9,8 +9,17 @@ For OS X users that frequently develop workflows for command-line launcher [Alfr
 
 ## Manual Installation
 
-* Clone this repo locally.
+* Clone this repository locally.
 * Copy `bin/awf` to a folder in your `$PATH`, e.g.:
 
         cp bin/awf /usr/local/bin/
 
+# Usage
+
+```shell
+
+$ awf help all
+
+
+
+```
