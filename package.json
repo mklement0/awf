@@ -1,6 +1,6 @@
 {
   "name": "awf",
-  "version": "0.0.0",
+  "version": "0.0.1-0",
   "os": "darwin",
   "description": "CLI for managing Alfred workflows",
   "bin": "bin/awf",

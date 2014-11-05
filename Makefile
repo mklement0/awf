@@ -48,4 +48,3 @@ else
 	 echo git commit -a -m "$$newTag" && echo git tag -a -m "$$newTag" "$$newTag" || exit; \
 	 echo "Version bumped to $$newVer; changes committed and tagged $$newTag."
 endif	
-
