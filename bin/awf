@@ -1,0 +1,2314 @@
+#!/usr/bin/env bash
+
+THIS_NAME=$(basename "$BASH_SOURCE")
+# Note: the following line is automatically updated by `make version VERSION=<new-version>`
+THIS_VERSION=0.6.0
+
+# Helper function for exiting with error message due to runtime error.
+#   die [errMsg [exitCode]]
+# Default error message states context and indicates that execution is aborted. Default exit code is 1.
+# Prefix for context is always prepended.
+# Note: An error message is *always* printed; if you just want to exit with a specific code silently, use `exit n` directly.
+die() {
+  echo "$THIS_NAME: ERROR: ${1:-"ABORTING due to unexpected error."}" 1>&2
+  exit ${2:-1} # Note: If the argument is non-numeric, the shell prints a warning and uses exit code 255.
+}
+
+# Helper function for exiting with error message due to invalid arguments.
+#   dieSyntax [errMsg]
+# Default error message is provided, as is prefix and suffix; exit code is always 2.
+dieSyntax() {
+    echo "$THIS_NAME: ARGUMENT ERROR: ${1:-"Invalid argument(s) specified."} Use \`$THIS_NAME help [command]\` for help." 1>&2
+    exit 2
+}
+
+  # The patterns for describing what files should be excluded from the output archive.
+EXCLUSION_PATTERNS=( '.*' '*.alfredworkflow' )
+
+# The set of all output fields (keys in the Info.plist XML files that contain the top-level metadata describing the workflow, plus some pseudo fields)
+# !! Do not modify FIELD_NAMES and FIELD_IDs after the fact.
+# !! Field widths are *typical* values, there is no fixed upper bound, so columnated display will not always work as intended.
+FIELD_IDS=(  p                        l                      a                                 i        n    d           c        b         w          r)
+FIELD_NAMES=(installpath              devpath                disabled                          bundleid name description category createdby webaddress readme)
+FIELD_HDIVS=(-----------              -------                --------                          -------- ---- ----------- -------- --------- ---------- ------)
+FIELD_DESCR=('path where installed'   'dev path (linked-to)' 'workflow currently disabled?'    ''       ''    ''         ''       ''        ''         'single-line, with escapes')
+FIELD_WIDTHS=(110                     110                    8                                 50       65   100         20       30        100         100)
+# 
+printFieldsHelp() {
+  local indentation=$1
+  { 
+    printf '%s\t%s\t%s%s\n' 'id' 'field name' 'comment'
+    printf '%s\t%s\t%s%s\n' '--' '----------' '-------'
+    for (( i = 0; i < ${#FIELD_IDS[@]}; i++ )); do
+      printf '%s\t%s\t%s%s\n' "${FIELD_IDS[i]}" "${FIELD_NAMES[i]}" "${FIELD_DESCR[i]:+# }" "${FIELD_DESCR[i]}" 
+    done
+  } | expand -t 4,20 | sed "s/^/$indentation/"
+}
+
+# Default output fields expressed as ID-char strings (the format used with the -o option)
+DEFAULT_FIELD_IDS_INFO='plaindcbwr'
+DEFAULT_FIELD_IDS_LIST='nic'
+
+# Alfred's prefix for the names of folders housing installed workflows.
+WF_NAMEPREFIX='user.workflow.'
+
+# Our CUSTOM prefix for the symlinks to dev. workflow folders to create in the folder hosting all installed workflows.
+DEV_WF_NAMEPREFIX='dev.workflow.'
+
+cliHelp() {
+
+  local synopses cmd=$1 cmds all=0
+
+  [[ $cmd =~ ^[aA][lL][lL]$ ]] && all=1
+
+  IFS= read -d '' -r synopses <<EOF
+  $THIS_NAME list|ls [-b] [-o fieldIdChars] [[-s fieldIdChars] [-x|-r] searchTerm]
+    Lists installed workflows, optionally with custom output and filtering.
+  $THIS_NAME search          [searchTerm]
+    Searches for workflows in the Alfred Preferences application.
+
+  $THIS_NAME info [-b] [-o fieldIdChars] [wfFolderOrBundleID]
+    Prints a workflow's metadata, optionally with selectable output fields.
+  $THIS_NAME id              [wfFolder]
+    Prints the bundle ID of a workflow.
+  $THIS_NAME which [-l|-P] [-R]          [wfDevFolderOrBundleID]
+    Prints the full path to an installed workflow's folder.    
+  $THIS_NAME reveal [-P]     [wfDevFolderOrBundleID]
+    Reveals an installed workflow's folder in Finder.
+
+  $THIS_NAME cd [-P]         [wfFolderOrBundleID]
+    Changes to an installed workflow's folder in a new Terminal window.
+  $THIS_NAME edit            [wfFolderOrBundleID]
+    Opens a workflow for editing in the Alfred Preferences application.
+
+  $THIS_NAME install         [wfDevFolder]
+    Installs a workflow from a dev folder.
+  $THIS_NAME export  [-R]    [wfFolder [outFolder]]
+    Exports a workflow to an *.alfredworkflow ZIP archive.
+
+  $THIS_NAME link|ln [-f]    [wfDevFolder]
+    Symlinks a dev workflow into the folder of installed workflows.
+  $THIS_NAME unlink|unln     [wfFolderOrBundleID]
+    Removes a symlink to a dev workflow from the folder of installed ones.
+  $THIS_NAME prune
+    Removes dead symlinks from the folder of installed workflows.
+  $THIS_NAME todev [-R]      [wfInstalledFolderOrBundleID [wfDevFolder]]
+    Converts an installed workflow to a dev workflow.
+  $THIS_NAME fromdev [-k]    [wfDevFolder]
+    Converts a dev workflow to a regular installed workflow.
+  $THIS_NAME version [-f] [wfFolderOrBundleId [newVersion|'major|'minor'|'patch']]
+    Prints or assigns a workflow's version number.
+
+  $THIS_NAME help [all]
+  $THIS_NAME help command
+  $THIS_NAME command -h
+    Prints help information.
+EOF
+
+  echo "SYNOPSIS"
+  
+  if [[ -z $cmd ]] || (( all )); then
+    echo "$synopses"
+    cat <<EOF
+DESCRIPTION
+  Performs various operations related to Alfred 2 workflows.
+  (To learn about Alfred, go to http://alfredapp.com)
+
+  To get help for a specific command, use \`$THIS_NAME help <command>\`
+  or \`$THIS_NAME <command> -h\`.
+  
+  WFDEVFOLDER is a folder path containing an Alfred workflow
+   *dev* (development) project, in a *separate location* from and
+   and typically symlinked into the folder hosting all installed
+   workflows.
+  
+  WFINSTALLEDFOLDER is a path to a workflow folder among the
+   *installed* workflows.
+  
+  WFFOLDER can be either a dev or an installed workflow folder.
+  
+  Generally, not specifying a folder (or bundle ID) defaults to the current
+  folder.
+
+  In commands where a bundle ID can be specified to target a workflow, only
+  *installed* workflows are searched for said bundle ID.
+
+EOF
+
+  fi
+
+  if [[ -n $cmd ]] || (( all )); then
+
+    if (( all )); then
+      # Extract all command names - in the order in which they appear in the synopsis.
+      cmds=$(awk -F '[[:blank:]]+|[|]' '/^[[:blank:]]+'"$THIS_NAME"'/ {print $3}' <<<"$synopses")
+    else
+      cmds=$cmd
+    fi
+
+    for cmd in $cmds; do
+
+      (( all )) && echo $'\n--------'
+
+      egrep -i -A 1 "\s+$THIS_NAME .*\<$cmd\>" <<<"$synopses" || die "Command not found: $cmd"
+
+      echo $'\nDESCRIPTION'
+
+      # NOTE: There is NO need to order the case branches to match the order in which commands appear in the synopsis.
+      #       The correct order is ensured by virtue of looping over command names in the order in which they appear in the synopsis.
+      case "$cmd" in
+        'install')
+          cat <<EOF
+  Installs (imports into Alfred) the specified dev workflow.
+  Unlike the \`link\` command, this installs an independent copy
+  of the dev workflow, and Alfred will strip hotkeys.
+  Note that Alfred will display a GUI confirmation prompt.
+  
+  Behind the scenes, the target folder's contents are archived
+  to a temporary *.alfredworkflow ZIP file and then opened in Alfred,
+  triggering the installation (import).
+
+  Note: Files matching the following patterns are excluded from
+  the resulting archive:
+    ${EXCLUSION_PATTERNS[@]}
+EOF
+          ;;
+        'export')
+          cat <<EOF
+  Exports a workflow by creating an *.alfredworkflow ZIP
+  archive for later installation (import).
+  The archive is always created with the folder's name as the
+  filename root of the archive, and placed in the workflow folder itself
+  by default.
+
+  -R
+    reveals the resulting archive in Finder.
+EOF
+          ;;
+        'link'|'ln')
+          cat <<EOF
+  Symlinks a dev workflow folder into Alfred's installed workflows
+  so as to allow direct use and modification of an in-development workflow.
+  If the workflow has a bundle ID defined (which is recommended), there
+  mustn't be an installed workflow with the same bundle ID. However, if
+  that installed workflow's folder is the very same symlink about to be
+  created, no error is reported and no action is performed.
+
+  -f 
+    Force creation of the symlink: If an installed workflow has the
+    same bundle ID *and* its folder is also a symlink, forces replacement
+    of the existing symlink.
+    Useful after moving the dev folder to a different location or changing
+    its name.
+EOF
+          ;;
+        'unlink'|'unln')
+          cat <<EOF
+  Removes a symlink to a dev workflow folder from among the installed
+  workflow folders.
+  The dev workflow may be specified directly as a dev workflow folder,
+  indirectly as an installed workflow symlink, or even as a bundle ID.
+EOF
+          ;;
+        'prune')
+          cat <<EOF
+  Removes dead symlinks to dev workflow folders, if any, from among 
+  the installed workflow folders.
+EOF
+          ;;
+        'todev')
+          cat <<EOF
+  Converts an installed workflow folder into a dev project
+  by moving its contents to a dev folder, removing the installed folder,
+  and then symlinking the dev folder into the folder of installed workflows,
+  as with the \`link\` command.
+
+  The workflow must be an installed, non-symlinked workflow - specified
+  either by path or bundle ID - and the dev folder must either not exist
+  yet (it is created on demand) or be empty.
+  
+  Not specifying a dev folder presents a GUI prompt for its creation.
+
+  -R
+    Reveals the newly created symlink in Finder.
+EOF
+          ;;
+        'fromdev')
+          cat <<EOF
+  Converts a dev workflow to a regular installed workflow by
+  moving its contents to a new folder among the installed workflows.
+
+  Just like Alfred-created workflow folders, the new folder will be
+  named '$WF_NAMEPREFIX{UUID}', i.e., its name will contain a randomly
+  chosen unique component.
+
+  -k
+    Keeps the dev workflow folder; i.e., instead of *moving* its contents
+    and then removing the folder, its contents is *copied*, and the folder
+    and its contents are retained as is.
+    Note that this will render the dev workflow folder a detached,
+    independent copy of the newly installed workflow.
+EOF
+          ;;
+        'version')
+          cat <<EOF
+  Returns or sets a workflow's version number, optionally by inrementing
+  a component of the current version number.
+
+  The workflow may be specified by folder path or bundle ID; defaults is the
+  current folder.
+  
+  Without specifying a new version, the workflow's current version is output.
+  If there is none, the exit code is set to 2, and a warning is printed.
+
+  Valid version numbers have 1-3 .-separated components, and each component
+  must be composed of digits only. The component names are:
+  major, minor, and patch.
+  
+  As an alternative to directly specifying a new version number, an
+  increment specifier may be used.
+  Supported increment specifiers are 'major', 'minor', 'patch', which
+  increment (by 1) the respective version component of the current
+  version number. A missing component is treated as 0.
+  Any lower components are set as follows: the minor component is set to 0,
+  the patch component is omitted.
+  Caveat: any 0-padding of components is lost in the process.
+
+  -f
+    Forces updating the version number, even if the new version number is
+    lower than the current one, or the current version number is invalid.
+
+  A workflow's version number is by convention stored in a plain-text file
+  named 'version' in the workflow's folder. The file must without exception
+  contain a version number only, and the file must have 1 line only; no whitespace allowed.
+
+EXAMPLES
+    # Print version of the workflow in the current folder:
+  $THIS_NAME version
+    # Increment the patch component of the version number of the workflow
+    # in the current folder (e.g., 0.5.1 -> 0.5.2)
+  $THIS_NAME version . patch
+
+EOF
+          ;;
+        'which')
+          cat <<EOF
+  Prints the full path to the specified workflow's folder among the
+  *installed* workflows by default; the workflow can be specified either
+  by bundle ID or [dev] folder path.
+
+  As a special case, you may specify '/' to print the *root* folder of
+  all installed workflows.
+
+  -l
+    If the installed-workflow folder is a symlink - i.e., has an underlying
+    dev folder - the symlink's target is also printed, \`ls -l\`-style
+    ('a@ -> b')
+
+  -P
+    If the installed-workflow folder is a symlink - i.e., has an underlying
+    dev folder - only the dev folder's path is printed.
+
+  -R
+    In addition to printing its path, reveals the folder in Finder.
+
+EXAMPLES
+    # Print the installed location (only) of the dev workflow stored
+    # in the current folder:
+  $THIS_NAME which -b
+    # Print the installed location and, if applicable, the underlying
+    # dev location of the workflow with the specified bundle ID:
+  $THIS_NAME which net.same2u.alfw.StringLength
+EOF
+          ;;
+        'id')
+          cat <<EOF
+  Prints the bundle ID of a workflow specified by its folder path.
+  Omitting the folder path targets the current folder.
+
+EXAMPLES
+    # Print the bundle ID of the workflow in the specified folder:
+  $THIS_NAME id ~/Projects/Alfred/StringLength
+EOF
+          ;;
+        'info')
+          cat <<EOF
+  Prints information (metadata) about a workflow, mostly extracted from the
+  Info.plist file. The workflow can be specified either by bundle ID
+  or folder path.
+
+  Each field value is printed on its own line, preceded by the field name.
+  To suppress the field name, use -b.
+  
+  To override the default output fields, use -o with a string of
+  field-identifier characters (see below).
+  Default output field IDs are:
+    ${DEFAULT_FIELD_IDS_INFO[@]}
+
+  -b
+    Bare output; omits the field names.
+
+  -o fieldIdChars
+    Selects the desired output fields in order using the following
+    single-character identifiers in any order, with no separator:
+$(printFieldsHelp '    ')
+
+EXAMPLES
+    # Print metadata for workflow in current folder:
+  $THIS_NAME info  
+    # Print name and bundleID fields without field names for
+    # workflow with bundle ID 'net.same2u.alfw.StringLength':
+  $THIS_NAME info -b -o ni net.same2u.alfw.StringLength
+EOF
+          ;;
+        'list'|'ls')
+          cat <<EOF
+  Lists metadata for *installed* workflows.
+
+  To override the default output fields, use -o with a string of
+  field-identifier characters (see below).
+  Default output field IDs are:
+    ${DEFAULT_FIELD_IDS_LIST[@]}
+  
+  Sorting is invariably based on the first output field.
+  Note: Due to limitations in OS X's \`sort\` utility, the current
+        locale is ignored (the "C" locale is used).
+
+  Unless you specify -b, a header is printed and an attempt is made to
+  align columns using spaces; note, however, that due to unpredictable
+  field lengths the alignment will not always work as intended.
+
+  You can filter the output by specifying a search term:
+  Scope:
+    By default, only the name field is searched.
+    Use -s with field IDs to determine what field(s) to search instead.
+    Search fields do not have to be output fields too.
+  Method:
+    By default, literal substring matching is used - see options below
+    for alternative methods.
+  Case:
+    Matching is case-INsensitive, regardless of matching method.
+
+  -b
+    Bare output; suppresses the header and separates output fields by a
+    tab each, suitable for automated processing.
+
+  -o outputFieldIdChars
+  -s searchFieldIdChars
+    Selects the desired output/searchs fields in order, using the following
+    single-character identifiers in any order, with no separator:
+$(printFieldsHelp '    ')
+
+  -x
+    Exact matching; the search term must match (one of) the specified or
+    implied search field(s) literally and in full.
+
+  -r
+    Regex matching; the search term is interpreted as an extended
+    regular expressions; to match (one of) the field(s) in full, anchor with
+    '^...$'
+
+EXAMPLES
+    # List all installed workflows:
+  $THIS_NAME ls
+    # List all installed workflows whose name contains 'chrome'
+    # by name and description:
+  $THIS_NAME ls -o nd chrome
+      # List all disabled workflows by name:
+  $THIS_NAME ls -o n -s a true
+    # List name and bundle ID of workflows whose bundle ID starts with
+    # 'net.same2u.':
+  $THIS_NAME ls -o ni -s i -r '^net\.same2u\.'
+EOF
+          ;;
+        'cd')
+          cat <<EOF
+  Opens a new Terminal window and makes the specified workflow's 
+  installed folder the current folder.
+
+  As a special case, you may specify '/' to change to the *root* folder of
+  all installed workflows.
+
+  -P
+    If the workflow is symlinked to a dev folder, the underlying dev folder
+    is changed to, not the symlinked path among the installed workflows.
+
+  Note: Since this script cannot change the current shell's working folder,
+        a new shell in a new Terminal window must be opened.
+
+EXAMPLES
+    # Open a new Terminal window and change to the folder of the
+    # (installed) workflow with the specified bundle ID:
+  $THIS_NAME cd net.same2u.alfw.StringLength
+EOF
+          ;;
+        'reveal')
+          cat <<EOF
+  Reveals the specified workflow's folder in Finder among the *installed*
+  workflows; the workflow can be specified either by bundle ID or
+  dev folder path.
+
+  As a special case, you may specify '/' to reveal the *root* folder of
+  all installed workflows.
+
+  This is effectively a shortcut to \`$THIS_NAME which -R\`, except that the folder path
+  is not also printed to stdout.  
+
+EXAMPLES
+    # Reveal the location of the workflow with the specified bundle ID
+    # in Finder:
+  $THIS_NAME reveal net.same2u.alfw.StringLength
+EOF
+          ;;
+        'edit')
+          cat <<EOF
+  Opens a workflow specified by folder path or bundle ID for editing in
+  the Alfred Preferences application.
+
+  As a special case you can specify '/' to merely open the Alfred
+  Preferences application to the Workflows tab.
+
+  NOTE: Since this command uses GUI scripting, the application executing
+  this utility - typically Terminal.app - must be authorized for assistive
+  access (System Preferences > Security & Privacy > Privacy > Accessibility).
+
+  The workflow must be an installed one. While you may specify the path
+  to a *dev* workflow, that workflow must currently be symlinked into
+  Alfred's installed workflows.
+
+  Note: For technical reasons, the target workflow must be located by
+  its *name* in Alfred's Preferences, and names are not guaranteed to be
+  unique. Thus, multiple workflows may match, and while the target workflow
+  will be among them, it may not be the one that is the current selection
+  in the UI.
+EOF
+          ;;
+        'search')
+          cat <<EOF
+  Searches for workflows by opening the Workflows tab in the
+  Alfred Preferences application and pasting the search term there.
+
+  NOTE: Since this command uses GUI scripting, the application executing
+  this utility - typically Terminal.app - must be authorized for assistive
+  access (System Preferences > Security & Privacy > Privacy > Accessibility).
+
+  The search term can be:
+   - the prefix of a word or phrase contained in workflow names
+   - the prefix of workflows' keywords
+   - a substring of a hotkey representation
+  Matching is always case-INsensitive.
+
+  To match a hotkey representation, you must use the correct modifier-key
+  symbols:
+    ⌃ ... Control
+    ⌥ ... Option
+    ⌘ ... Command
+    ⇧ ... Shift
+  Caveat: Only exact substrings of the hotkey representations can be
+          be matched, so that ⌥⌘V can be found via ⌘V, but not ⌥V.
+
+EXAMPLES
+    # Search for workflows containing 'vm'
+  $THIS_NAME search vm
+    # Search for workflows whose hotkey representations contain
+    # the key combination Command-C
+  $THIS_NAME search ⌘c
+EOF
+          ;;
+        'help')
+          cat <<EOF
+  If no argument is specified: prints a brief overview of all commands and
+  general information.
+
+  If a command name is specified: prints detailed help specific to that 
+  command.
+
+  If 'all' is specified: prints both an overview and detailed help for
+  ALL commands.
+
+EXAMPLES
+    # Print help overview only:
+  $THIS_NAME help
+    # Print help overview, followed by detailed help for all commands:
+  $THIS_NAME help all
+    # Print detailed help for the 'info' command.
+  $THIS_NAME help info
+  $THIS_NAME info -h  # same as above
+EOF
+          ;;
+        esac
+
+      done # for
+
+    fi
+
+}
+
+# General command-line help; see also: `help` command below.
+if [[ $1 == '--help' || $1 == '-h' ]]; then
+  cliHelp
+    exit 0
+fi
+
+# --- BEGIN: Helper functions
+
+# SYNOPSIS
+#     indexOf needle "${haystack[@]}"
+# *Via stdout*, returns the zero-based index of a string element in an array of strings or -1, if not found.
+# The *return code* indicates if the element was found or not.
+# EXAMPLE
+#   a=('one' 'two' 'three')
+#   ndx=$(indexOf 'two' "${a[@]}") # -> $ndx is now 1
+indexOf() {
+  local e ndx=-1
+  for e in "${@:2}"; do (( ++ndx )); [[ "$e" == "$1" ]] && echo $ndx && return 0; done
+  echo '-1'; return 1
+}
+
+# SYNOPSIS
+#  indexOfSubstr needle haystack
+# BEGIN
+#  Outputs the *0*-based index of substring NEEDLE in string HAYSTACK, -1 if not found.
+#  NOTE: Comparison is *always case-sensitive*.
+# EXAMPLE
+#   ndx=$(indexOfSubstr 'abc' 'c') # -> $ndx == '2'
+indexOfSubstr() { awk -v needle="$1" -v haystack="$2" 'BEGIN {print -1 + index(haystack,needle)}'; }
+
+# SYNOPSIS
+#   mergeCharLists charList1 charList2
+# DESCRIPTION
+#   Merges 2 character lists assumed by only appending those characters from CHARLIST2
+#   to [a copy of ] CHARLIST1 that aren't already present there.
+# EXAMPLE
+#   mergeCharLists 'abc' 'fchb' # -> 'abcfh'
+mergeCharLists() {
+  local l1=$1 l2=$2 char lRes
+  lRes=$1
+  for (( i = 0; i < ${#l2}; i++ )); do
+    char=${l2:i:1}
+    [[ ${l1/$char/} == "$l1" ]] && lRes+=$char
+  done
+  echo "$lRes"
+}
+
+# Compares 2 version strings (thanks, http://stackoverflow.com/a/4025065/45375)
+#   - supports *numerical* components only
+#   - leading zeros in components are ignored
+# Result is indicated via *return value*:
+#  0 == identical
+#  1 == v1 > v2, "1st version is higher"
+#  2 == v1 < v2, "2nd version is higher"
+# Example:
+#   vercomp 2.1 2.2  # -> returns exit code 2, because 2.1 < 2.2
+vercomp () {
+    [[ $1 == $2 ]] && return 0
+    local i v1=$1 v2=$2
+    # As a courtesy, remove an initial 'v', if present
+    [[ ${v1:0:1} == 'v' ]] && v1=${v1:1}
+    [[ ${v2:0:1} == 'v' ]] && v2=${v2:1}    
+    local IFS='.'
+    local i vna1=( $v1 ) vna2=( $v2 )
+    # fill empty fields in vna1 with zeros
+    for ((i=${#vna1[@]}; i<${#vna2[@]}; i++)); do
+        vna1[i]=0
+    done
+    for ((i=0; i<${#vna1[@]}; i++)); do
+        # Fill empty fields in vna2 with zeros
+        [[ -z ${vna2[i]} ]] && vna2[i]=0
+        (( 10#${vna1[i]} > 10#${vna2[i]} )) && return 1
+        (( 10#${vna1[i]} < 10#${vna2[i]} )) && return 2
+    done
+    return 0
+}
+
+# SYNOPSIS
+#   isInSubtree fileOrFolder putativeAncestorFolder [childrenOnly]
+# DESCRIPTION
+#   Indicates if FILEORFOLDER is in the subtree of PUTATIVEANCESTORFOLDER,
+#   using case-INsensitive COMPARISON.
+#   I.e., tests whether FILEORFOLDER is either a child (direct descendant)
+#   or indirect descendant of PUTATIVEANCESTORFOLDER.
+#   To restrict matching to immediate child items, pass 1 for CHILDRENONLY.
+#   Paths are normalized as much as possible, but symlinks are NOT followed.
+#   Extant paths are fully normalized, non-extant paths are prefix-normalized.
+#   Differences with respect to a terminating / are ignored.
+# EXAMPLES
+#  isInSubtree /usr/local/bin /usr    # -> exit code 0 # yes, in subtree
+#  isInSubtree /usr/local/bin /usr 1  # -> exit code 1 # no, not a direct child
+#  isInSubtree . ~                    # -> exit code 0, if current dir. is descendant of home dir.
+isInSubtree() {
+  local paths=("$1" "$2") childrenOnly=${3:-0}
+  for (( i = 0; i < "${#paths[@]}"; i++ )); do
+    if [[ -d ${paths[i]} ]]; then # path is extant folder, normalize it.
+        paths[i]=$(cd "${paths[i]}"; echo "$PWD")
+    elif [[ -d $(dirname "${paths[i]}") ]]; then # parent path exists, normalize it and append last component
+      name=$(basename "${paths[i]}"); [[ $name == '/' ]] && name=''
+      fldr=$(cd "$(dirname "${paths[i]}")"; echo "$PWD")
+      paths[i]=${fldr%/}/$name
+    else # non-extant path, perform courtesy prefix normalizations
+      case "${paths[i]}" in
+        ./*) # replace './' prefix with current dir.
+          paths[i]=${PWD%/}/${paths[i]:2}
+          ;;
+        ../*) # replace '../' prefix with normalized parent dir.
+          fldr=$(cd "${PWD%/}/.."; echo "$PWD")
+          paths[i]=${fldr%/}/${paths[i]:3}
+          ;;
+        /*) # already an absolute path, nothing to do.
+          ;;
+        *) # not an absolute path, prepend current dir.
+          paths[i]=${PWD%/}/${paths[i]}
+          ;;
+      esac
+    fi
+  done
+  if (( childrenOnly )); then
+    (shopt -s nocasematch; [[ $(dirname "${paths[0]}") == ${paths[1]} ]])
+  else
+    (shopt -s nocasematch; [[ ${paths[0]} == "${paths[1]%/}/"* ]])
+  fi
+}
+
+# SYNOPSIS
+#   isChild fileOrFolder putativeParentFolder
+# DESCRIPTION
+#   Indicates if FILEORFOLDER is an immediate child item of PUTATIVEPARENTFOLDER.
+# NOTE
+#  Convenience wrapper around isInSubtree() with a fixed value of 1 passed for CHILDRENONLY; see there.
+isChild() {
+  isInSubtree "$1" "$2" 1
+}
+
+# SYNOPIS
+#   isDirEmpty dir
+# DESCRIPTION
+#   Indicates if the specified directory is fully empty (exit code 0) or not (exit code 1).
+#   The directory must exist, otherwise an error message is printed and the exit code is set to 3.
+#   Fully empty means that hidden items are also considered, with the exception of '.DS_Store' - i.e.,
+#   a directory containing only this 1 file is still considered empty. ('.DS_Store' contains view state for the Finder on OSX).
+# EXAMPLE
+#  isDirEmpty ~/Applications && echo "~/Applications is completely empty."
+isDirEmpty() {
+  [[ -d "${1:-.}" ]] || { echo "$FUNCNAME: ERROR: Argument not found or not a directory: $1"; return 3; }
+  [[ $(shopt -s nullglob dotglob; cd "$1"; echo *) =~ ^$|^\.DS_Store$ ]]
+}
+
+# SYNOPSIS
+#   getSymlinkTo fileOrFolder [putativeSymlinkParentFolder]
+# DESCRIPTION
+#   Returns the full path of the symlink located in PUTATIVESYMLINKPARENTFOLDER
+#   that points to FILEORFOLDER.
+#
+#   PUTATIVESYMLINKPARENTFOLDER defaults to the current folder.
+#   If no such symlink exists, no output is generated and the exit code is set to 1.
+#    PUTATIVESYMLINKPARENTFOLDER, which defaults to the current folder.
+#
+#   Note: Both FILEORFOLDER and PUTATIVESYMLINKPARENTFOLDER must exist.
+#   Platforms: OSX and Linux
+getSymlinkTo() {
+  local origFolder=$1 putativeSymlinkParentFolder=${2:-$PWD} f thisOrig thisOrigInode
+  # Make sure both folders exist.
+  for f in "$origFolder" "$putativeSymlinkParentFolder"; do
+    [[ -d $f ]] || { echo "ERROR: Folder not found: $f" >&2; return 1; }
+  done
+  # Resolve the putative parent folder to an absolute, normalized path.
+  putativeSymlinkParentFolder=$(cd "$putativeSymlinkParentFolder"; echo "$PWD")
+  # Determine platform-specific option for `stat`.
+  formatOpt='-c'
+  [[ $(uname) == 'Darwin' ]] && formatOpt='-f'
+  # Determine the orig. folder's inode number.
+  origInode=$(stat $formatOpt '%i' "$origFolder")
+  # Examine all symlinks in the putative parent folder.
+  while IFS= read -r lnk; do
+    thisOrig=$(readlink "$lnk")
+    # If the symlink is defined as a *relative* path, we must resolve it to a full path relative to the *parent* folder.
+    [[ $thisOrig == '/'* ]] || thisOrig="${putativeSymlinkParentFolder%/}/${thisOrig}"
+    [[ -e $thisOrig ]] || continue # ignore originals that don't exist
+    thisOrigInode=$(stat $formatOpt '%i' "$thisOrig")
+    [[ "$thisOrigInode" == "$origInode" ]] && { echo "$lnk"; return 0; }
+  done < <(find "$putativeSymlinkParentFolder" -mindepth 1 -maxdepth 1 -type l)
+  return 1
+}
+
+# Indicates if the specified folder is an Alfred 2 workflow folder,
+# i.e., whether it contains a workflow, regardless of its location (i.e., whether a dev or installed folder).
+isWfFolder() {
+  local f=${1:-.}
+  [[ -f $f/info.plist ]] && fgrep -q 'alfred.workflow.' "$f/info.plist"
+}
+
+# Indicates if the specified folder is an *installed* Alfred 2 workflow folder.
+isInstalledWfFolder() {  
+  isWfFolder "${1:-.}" && isChild "${1:-.}" "$(getInstalledWfsRootFolder)"
+}
+
+# Indicates if the specified folder is a *dev* Alfred 2 workflow folder, i.e.,
+# one that is NOT among the installed workflows (though it could be symlinked there).
+isDevWfFolder() {
+  isWfFolder "${1:-.}" && ! isChild "${1:-.}" "$(getInstalledWfsRootFolder)"
+}
+
+# Indicates if the specified folder is a *dev* Alfred 2 workflow folder that is *also installed*, i.e.,
+# *currently symlinked to from among the installed workflows.*
+isDevWfFolderInstalled() {
+  local f=${1:-.}
+  isDevWfFolder "$f" || { echo "ERROR: Not a dev workflow folder: $f" >&2; return 2; }
+  getSymlinkTo "$f" "$(getInstalledWfsRootFolder)" >/dev/null
+}
+
+# Indicates if the specified folder is an *installed* Alfred 2 workflow folder that is 
+# *symlinked to a dev folder*.
+isInstalledWfFolderSymlinked() {
+  local f=${1:-.}
+  isInstalledWfFolder "$f"  || { echo "ERROR: Not an installed workflow folder: $f" >&2; return 2; }
+  [[ -L $f ]]
+}
+
+getAndVerifyDevWfFolder() {
+  getAndVerifyWfFolder "$1" 1
+}
+
+getAndVerifyInstalledWfFolder() {
+  getAndVerifyWfFolder "$1" 2
+}
+
+getAndVerifyWfFolder() {
+
+  local wfFolder=${1:-.} # default to current folder.
+  local wfType=${2:-0} # 0 == unspecified, 1 == dev workflow, 2 == installed workflow
+  local WF_TYPE_QUALIFIERS=('' 'dev ' 'installed ')
+  local wfTypeQualifier=${WF_TYPE_QUALIFIERS[$wfType]}
+
+  [[ -d $wfFolder ]] || die "Specified ${wfTypeQualifier}workflow folder not found: $wfFolder"
+
+  # Expand to absolute path.
+  wfFolder=$(cd "$wfFolder"; echo "$PWD")
+
+  # Make sure the target folder is actually an Alfred workflow folder.
+  isWfFolder "$wfFolder" || die "Specified ${wfTypeQualifier}workflow folder does not contain an Alfred workflow: ${wfFolder/#$PWD/.}"
+
+  wfsRootFolder=$(getInstalledWfsRootFolder)
+
+  # Test for subtype, if specified.
+  # !! Only the literal paths are tested, meaning:
+  # !!  dev paths: could already be symlinked to from among the installed workflows, i.e.: could also be installed - to test for that, use isDevWfFolderInstalled()
+  # !!  installed paths: could be a symlink to a dev folder - to test for that, use isInstalledWfFolderSymlinked()
+  case "$wfType" in
+    1) # dev wf
+      ! isChild "$wfFolder" "$wfsRootFolder" || die "Folder is NOT a DEV workflow (must not be subfolder of '$wfsRootFolder'): ${wfFolder/#$PWD/.}"
+      ;;
+    2) # installed wf
+      isChild "$wfFolder" "$wfsRootFolder" || die "Folder is NOT an INSTALLED workflow (must be subfolder of '$wfsRootFolder'): ${wfFolder/#$PWD/.}"
+      ;;
+  esac
+
+  # Output absolute path.
+  echo "$wfFolder"
+
+}
+
+
+makeWfArchive() {
+  local archivePath=$1 sourcePath=$2
+      # Create the ZIP archive.
+      # !! By cd-ing to the source folder first we ensure that only paths *relative* to the source folders are recorded in the archive.
+  (cd "$sourcePath" && zip -r "$archivePath" . -x "${EXCLUSION_PATTERNS[@]}" >/dev/null) || die
+}
+
+# Get Alfred 2's user preferences folder.
+getPrefsFolder() {
+  local plist parentFolder folder
+  plist="$HOME/Library/Preferences/com.runningwithcrayons.Alfred-Preferences.plist"
+  [[ -f $plist ]] || die "Cannot locate Alfred's preferences plist file: $plist"
+  # Look for a sync folder first...
+  parentFolder=$(/usr/libexec/PlistBuddy -c 'print :syncfolder' "$plist" 2> /dev/null)
+  if [[ -n $parentFolder ]]; then
+    [[ ${parentFolder:0:1} == '~' ]] && parentFolder="$HOME${parentFolder:1}"
+  else # look in default location
+    parentFolder="$HOME/Library/Application Support/Alfred 2"
+  fi
+  folder="$parentFolder/Alfred.alfredpreferences"
+  [[ -d $folder ]] || die "Cannot locate Alfred's user preferences folder: $folder"
+  echo "$folder"
+}
+
+# Get the workflows root folder, i.e., the path of the folder in which Alfred 2 stores all installed workflows in subfolders.
+# !! Uses *global* variable $_CACHED_WFS_ROOT_FOLDER to cache the result.
+getInstalledWfsRootFolder() {
+  if [[ -z $_CACHED_WFS_ROOT_FOLDER ]]; then
+    _CACHED_WFS_ROOT_FOLDER="$(getPrefsFolder)/workflows"
+    [[ -d $_CACHED_WFS_ROOT_FOLDER ]] || die "Cannot locate Alfred's workflows folder: $_CACHED_WFS_ROOT_FOLDER"
+  fi
+  echo "$_CACHED_WFS_ROOT_FOLDER"
+}
+
+# Returns the full path of the Alfred 2 workflow folder hosting the workflow with the specified bundle ID.
+# If there is no such workflow, the exit code is set to 1 and nothing is output.
+getInstalledWfFolderByBundleId() {
+  local bundleId=$1 wfRootFolder
+  wfRootFolder=$(getInstalledWfsRootFolder)
+  for f in "$wfRootFolder/"*"/info.plist"; do
+    { /usr/libexec/PlistBuddy -c 'print "bundleid"' "$f" 2>/dev/null | fgrep -qix "$bundleId"; } && { echo "$(dirname "$f")"; return 0; }
+  done
+  return 1
+}
+
+# SYNOPSIS
+#   warnIfBundleIdMissing [wfFolder]
+warnIfBundleIdMissing() {
+  local plistFile=${1:-.}/info.plist
+  local bundleId=$(/usr/libexec/PlistBuddy -c 'print "bundleid"' "$plistFile")
+  if [[ -z $bundleId ]]; then
+    echo "WARNING: NO BUNDLE ID defined in: ${plistFile/#$PWD/.}" >&2
+  fi
+  return 0
+}
+
+# SYNOPSIS
+#   rreadlinkchain symLink
+# DESCRIPTION
+#  Recursive readlink: prints the CHAIN OF SYMLINKS from the input
+#  file to its ultimate target, with each path on a separate line.
+#  Only the ultimate target's path is canonical, though.
+# EXAMPLE
+#     # Print the symlink chain of the `git` executable in the $PATH.
+#   rreadlinkchain  "$(which git)"
+#    # Ditto, using single-line `ls -l`-style format ('a@ -> b')
+#   rreadlinkchain  "$(which git)" | sed -nE -e '$!{a\'$'\n''@ -> ' -e '}; p' | tr -d '\n'
+# THANKS
+#   http://stackoverflow.com/a/1116890/45375
+rreadlinkchain() ( # execute in *subshell* to localize the effect of `cd`
+
+  local target=$1 targetDir targetName
+  
+  while :; do
+      # Unless the file is a symlink OR exists, we report an error - note that using `-e` with a symlink reports the *target*'s existence, not the symlink's.
+    [[ -L $target || -e $target ]] || { printf '%s\n' "ERROR: $FUNCNAME: '$target' does not exist." 1>&2; return 1; }
+      # !! We use `cd` to change to the target's folder
+      # !! so we can correctly resolve the full dir. path.
+    builtin cd "$(command -p dirname "$target")" # note: cd "" is the same as cd . - i.e., a no-op.
+    targetDir=$PWD
+    targetName=$(command -p basename "$target")
+    done=0
+    if [[ ! -L $targetName ]]; then
+        # We've found the ultimate target (or the input file wasn't a symlink to begin with).
+        # For the *ultimate* target we want use `pwd -P` to make sure we use the actual, physical directory,
+        # (not a symlink) to get the *canonical* path.
+      targetDir=$(builtin pwd -P)
+      done=1
+    fi
+      # Print (next) path.
+    printf '%s\n' "${targetDir%/}/$targetName"
+      # Exit, if we've hit the non-symlink at the end of the chain.
+    (( done )) && break 
+      # File is symlink -> continue to resolve.
+    target=$(command -p readlink -- "$targetName")
+  done
+
+)
+
+stringEqualsNoCase() ( # !! Note the use of ( ... ) to execute the whole function body in a subshell.
+    shopt -s nocasematch
+    [[ $1 == $2 ]]
+)
+
+# SYNOPSIS
+#   capFirstChar txt
+# DESCRIPTION
+#   Capitalize the first character in the specified string.
+# EXAMPLE
+#   capFirstChar "abc" # -> 'Abc'
+capFirstChar() {
+  local str=$1
+  echo "$(tr '[:lower:]' '[:upper:]' <<<"${str:0:1}")${str:1}"
+}
+
+# # Indicates if the specified strings looks like a bundle ID, i.e., a string in reverse domain notation; e.g., 'net.same2u.alfred.vmwarefusionhelper'
+# # Expects at least 3 '.'-separated components, with the first one composed of at least 2 letters, followed by a mix of letters and '-'
+# # - see https://en.wikipedia.org/wiki/List_of_Internet_top-level_domains
+# looksLikeBundleId() {
+#   [[ $1 =~ ^[[:alpha:]]{2}[[:alpha:]-]*\.[[:alnum:]]+\.[[:alnum:]]+ ]]
+# }
+
+# SYNOPSIS
+#   getWfFieldsAndValuesByIdChars fieldIdChars [infoPlist]
+# DESCRIPTION
+#   Given a string of field ID characters, retrieves information about the fields identified
+#   and, if INFOPLIST (path to a workflow Info.plist file) is also specified, retrieves
+#   field *values*, too.
+#   The information is returned via the following *global arrays*:
+#   fieldIndices ... is filled with the indices into the global FIELD_* arrays corresponding to the ID chars.
+#   fieldNames ... is filled with the field names corresponding to the field IDs
+#   fieldWidth ... is filled with the typical field widths for columnated display.
+#   fieldDescriptions ... is filled with short descriptions for each field
+#   fieldVals ... is filled with the values of the specified fields, if INFOPLIST was specified
+getWfFieldsAndValuesByIdChars() {
+
+  local fieldIdChars=$1 infoPlist=$2 i char ndx fieldVal fieldName
+
+  # Initialize *global* output arrays.
+  fieldIndices=() fieldNames=() fieldWidths=() fieldDescriptions=() fieldHeaderDivs=()
+
+  for (( i = 0; i < ${#fieldIdChars}; i++ )); do
+    char="${fieldIdChars:i:1}"
+    ndx=$(indexOf "$char" "${FIELD_IDS[@]}") || die "Unknown output-field identifier: $char"
+    fieldName=${FIELD_NAMES[ndx]}
+    # Add to output arrays.
+    fieldIndices+=($ndx)
+    fieldNames+=("$fieldName")
+    fieldWidths+=("${FIELD_WIDTHS[ndx]}")
+    fieldDescriptions+=("${FIELD_DESCR[ndx]}")
+    fieldHeaderDivs+=("${FIELD_HDIVS[ndx]}")
+  done
+
+  # If an Info.plist file was specified, also obtain values.
+  if [[ -n $infoPlist ]]; then
+      getWfFieldValuesByIndices "$infoPlist" "${fieldIndices[@]}"
+  fi
+
+}
+
+# SYNOPSIS
+#   getWfFieldValuesByIndices infoPlist fieldIndex1 ...
+# DESCRIPTION
+#   Given a path to a workflow Info.plist file as INFOPLIST, retrieves
+#   the values for the specified fields (workflow metadata).
+#   Fields are specified as indices into the global FIELD_* arrays.
+#
+#   The information is returned via the following *global array*:
+#     fieldVals
+#
+#   Note that each value is guaranteed to be single-line, with newlines and tabs escaped as '\n' and '\t'.
+getWfFieldValuesByIndices() {
+
+  local infoPlist isInstalledLocation fieldId fieldIndex fieldName fieldVal
+
+  infoPlist=$1
+  shift  # remaining arguments must be field indices
+
+  isInstalledLocation=0
+  isChild "${infoPlist%/*}" "$(getInstalledWfsRootFolder)" && isInstalledLocation=1
+
+  # initialize *global* output array.
+  fieldVals=()
+
+  for fieldIndex; do
+    fieldId=${FIELD_IDS[fieldIndex]}
+    fieldName=${FIELD_NAMES[fieldIndex]}
+    case "$fieldId" in
+      'p') # installed location
+        if (( isInstalledLocation )); then
+          fieldVals+=("${infoPlist%/*}") # !! NOT using `dirname` - an external executable - does speed things up measurably.
+        else
+          fieldVals+=('')
+        fi
+        ;;
+      'l') # dev location
+        if (( isInstalledLocation )); then
+          if [[ -L "${infoPlist%/*}" ]]; then
+            fieldVals+=("$(readlink "${infoPlist%/*}")") # !! NOT using `dirname` - an external executable - does speed things up measurably.
+          else
+            fieldVals+=('')
+          fi
+        else
+          fieldVals+=("${infoPlist%/*}") # !! NOT using `dirname` - an external executable - does speed things up measurably.          
+        fi
+        ;;
+      'r')
+        fieldVal=$(/usr/libexec/PlistBuddy -c "print \"$fieldName\"" "$infoPlist" 2>/dev/null)
+        fieldVal=${fieldVal//$'\n'/\\n}
+        fieldVal=${fieldVal//$'\t'/\\t}
+        fieldVals+=("$fieldVal")
+        ;;
+      *)
+        fieldVals+=("$(/usr/libexec/PlistBuddy -c "print \"$fieldName\"" "$infoPlist" 2>/dev/null)")
+        ;;
+    esac
+  done
+
+}
+
+# SYNOPSIS
+#  searchForWfsInAlfredPrefs [searchTerm]
+# DESCRIPTION
+#  Opens the Workflows tab of the Alfred Preferences and paste the specified search term into the search field,
+#  effectively filtering the list of installed workflows down to matching ones.
+#  Caveats: 
+#    - Uses GUI scripting, so the executing application must be enabled for assistive access (System Preferences > Security & Privacy > Privacy > Accessibility).
+searchForWfsInAlfredPrefs() {
+  local name=$1
+   osascript - "$name" <<'EOF'
+    on run (argv)
+      my showWorkflowsInAlfredPrefs(item 1 of argv as text)
+    end run
+    
+    # Shows the Workflows tab in Alfred Preferences.app optionally filtered by a search term.
+    # Note that any scope filters - such as showing only a specific category's workflows -  are reset first, so that the scope is always ALL workflows.
+    # !! As of Alfred 2.5.1, resetting the scope filter involves a multi-second delay and visually disruptive GUI scripting.
+    on showWorkflowsInAlfredPrefs(searchText)
+      
+      activate application "Alfred Preferences"
+      tell application "System Events"
+        tell process "Alfred Preferences"
+          tell front window
+            perform action "AXRaise" # !! This is crucial, as - due to a bug - the window ends up inactive when `activate application "Alfred Preferences"` is run while the app is not running.
+            click (first button of first toolbar whose name is "Workflows") # !! as of Alfred 2.5: while the click is effective, the toolbar button is not highlighted as focused if the window was already open with a different tab selected  - seems to be a bug.
+          end tell
+          # Assign filter (search) term or, if not specified, "" to clear the search field.
+          tell (first text field of front window whose role description is "search text field")
+            if searchText is missing value then set searchText to ""
+            my resetWfSearch() # Reset 
+            set focused to true
+            set value to searchText
+            if length of searchText > 0 then
+              keystroke return # sending Return is only required to ensure that the search-field contents ends up *selected*.
+            end if
+          end tell
+        end tell
+      end tell
+      
+    end showWorkflowsInAlfredPrefs
+    
+    # Resets the current search in the Workflows tab of Alfred Preferences.app by ensuring
+    # that both the search field is cleared *and* any *scope filter* (category filter) is reset.
+    # NOTE: Alfred Preferences is assumed to be frontmost.
+    # If a scope filter is found to be in effect:
+    #     !! Must use GUI scripting for technical reasons. 
+    #     !! Visually disruptive, and, as of Alfred 2.5.1, involves a multi-second delay.
+    on resetWfSearch()
+      local btn, searchField, isFiltered
+      tell application "System Events"
+        tell front window of process "Alfred Preferences"
+          
+          set searchField to (first text field whose role description is "search text field")
+          
+          # !! We must use the placeholder value (input hint) to determine if a scope filter is in effect.
+          set isFiltered to value of attribute "AXPlaceholderValue" of searchField ≠ "Search"
+          
+          if isFiltered then # scope filter in effect -> we must use GUI scripting to reset it
+            # !! We need to click on the gear-icon button next to the search field in order to GUI-script
+            # !! resetting the search. That button - whose index varies based on what workflow is being
+            # !! displayed in the main pane - can be identified via a value of "action" in the "AXDescription"
+            # !! attribute. Sadly, not all buttons have this attribute, so a filter such as `whose value of attribute "AXDescription" ...`
+            # !! causes an error. Therefore, we must roll our own filter using a repeat loop.
+            local btn
+            repeat with btn in every button
+              tell btn
+                try
+                  if value of attribute "AXDescription" = "action" then
+                    # !! Sadly, as of Alfred 2.5.1 (seen on 10.9 and 10.10), this statement causes a MULTI-SECOND DELAY.
+                    click
+                    # !! Sadly, as of Alfred 2.5.1 (seen on 10.9 and 10.10), the menu child UI element never becomes accessible, so our only option
+                    # !! is to send keystrokes, if targeting the menu fails.
+                    try # try invoking the menu command
+                      click (first menu item of menu 1 whose value of attribute "AXTitle" is "Reset Search") # click menu item that resets the search
+                    on error # fall back to sending keystrokes
+                      if frontmost of application "Alfred Preferences" then keystroke "Reset Search" & return
+                    end try
+                    exit repeat
+                  end if
+                end try
+              end tell
+            end repeat
+          else # not filtered -> we avoid GUI scripting and simply clear the search field
+            # Clear the search field; Alfred immediately reverts to showing all workflows.
+            set value of searchField to ""
+          end if
+        end tell
+      end tell
+    end resetWfSearch
+EOF
+}
+
+
+# --- END: Helper functions
+
+# --- BEGIN: Main command-implementing functions
+
+installWf() {
+
+  local wfDevFolder archiveFile
+
+  # Option-parameters loop.
+  while (( $# )); do
+    case $1 in
+      --) # Explicit end-of-options marker.
+        shift   # Move to next param and proceed with data-argument analysis below.
+        break
+        ;;
+      -?|--?*) # An unrecognized switch.
+        dieSyntax "Unrecognized option: '$1'. To force interpretation as non-option, precede with '--'."
+        ;;
+      *)  # 1st non-option argument reached; proceed below.
+        break
+        ;;
+    esac
+    shift
+  done
+
+    # Parse arguments.
+  case $# in
+    0|1)
+      wfDevFolder=${1:-.}
+      ;;
+    *)
+      dieSyntax "Unexpected number of arguments specified."
+      ;;
+  esac
+
+  # Verify existence of and obtain absolute path of explicit or implied dev workflow folder.
+  wfDevFolder=$(getAndVerifyDevWfFolder "$wfDevFolder") || exit
+
+  # In addition to ensuring that the folder is a *dev* workflow (not among the installed workflows),
+  # we also ensure that it is not *currently installed* (via a symlink to it among the installed workflows).
+  ! isDevWfFolderInstalled "$wfDevFolder" || die "Specified dev workflow folder is already installed, via a symlink: $wfDevFolder"
+
+  warnIfBundleIdMissing "$wfDevFolder"
+
+  # Determine the path of the archive file to be created, using a *temporary* file.
+  archiveFile=$(mktemp -u -t "$(basename "$wfDevFolder")").alfredworkflow
+
+  # Create the archive file.
+  makeWfArchive "$archiveFile" "$wfDevFolder" || die
+
+  echo "Temp. archive created, triggering import into Alfred..."
+  # Simply open the *.alfredworkflow file, which will trigger import into Alfred.
+  open -- "$archiveFile" || die "Opening the archive for import failed; is Alfred installed? $archiveFile"
+  # !! Sadly, we can't clean up the temp. file, as we cannot know when Alfred has finished importing;
+  # !! however, the temp. file will be removed on next boot.
+
+}
+
+exportWf() {
+
+  local wfFolder exportFolder wfProjectName archiveFile
+
+  # Option-parameters loop.
+  local reveal=0
+  while (( $# )); do
+    case $1 in
+      --) # Explicit end-of-options marker.
+        shift   # Move to next param and proceed with data-argument analysis below.
+        break
+        ;;
+      -R|--reveal)
+        reveal=1;
+        ;;
+      -?|--?*) # An unrecognized switch.
+        dieSyntax "Unrecognized option: '$1'. To force interpretation as non-option, precede with '--'."
+        ;;
+      *)  # 1st non-option argument reached; proceed below.
+        break
+        ;;
+    esac
+    shift
+  done
+
+    # Parse arguments.
+  case $# in
+    0|1)
+      wfFolder=${1:-.}
+      ;;
+    *)
+      dieSyntax "Unexpected number of arguments specified."
+      ;;
+  esac
+
+  # Verify existence of and obtain absolute path of explicit or implied dev workflow folder.
+  wfFolder=$(getAndVerifyWfFolder "$wfFolder") || exit
+
+  warnIfBundleIdMissing "$wfFolder"
+
+  exportFolder=${1:-$wfFolder}; shift
+  [[ -d $exportFolder ]] || die "Specified export folder not found: $exportFolder"
+
+  # Make sure that not too many parameters were specified.
+  (( $# == 0 )) || dieSyntax "Unexpected argument(s) specified."
+
+  # Determine the folder and filename of the archive file to be created.
+  wfProjectName=$(basename "$PWD")
+
+  # Create archive in specified export folder, or same folder as project by default.
+  archiveFile="$exportFolder/$wfProjectName.alfredworkflow"
+  
+  # Remove old archive file, if present.
+  [[ -f $archiveFile ]] && { rm "$archiveFile" || die; }
+
+  # Create the archive file.
+  makeWfArchive "$archiveFile" "$wfDevFolder" || die
+    
+  echo "Workflow archive successfully created: ${archiveFile/#$PWD/.}"
+
+  (( reveal )) && open -R -- "$archiveFile" || : # note the required use of -R here, because it is a FILE getting revealed.
+
+}
+
+getWfBundleIdByFolder() {
+
+  local wfDevFolder bundleId
+
+  # Option-parameters loop.
+  while (( $# )); do
+    case $1 in
+      --) # Explicit end-of-options marker.
+        shift   # Move to next param and proceed with data-argument analysis below.
+        break
+        ;;
+      -?|--?*) # An unrecognized switch.
+        dieSyntax "Unrecognized option: '$1'. To force interpretation as non-option, precede with '--'."
+        ;;
+      *)  # 1st non-option argument reached; proceed below.
+        break
+        ;;
+    esac
+    shift
+  done
+
+    # Parse arguments.
+  case $# in
+    0|1)
+      wfDevFolder=${1:-.}
+      ;;
+    *)
+      dieSyntax "Unexpected number of arguments specified."
+      ;;
+  esac
+
+  # Verify existence of and obtain absolute path of explicit or implied workflow folder.
+  wfDevFolder=$(getAndVerifyWfFolder "$wfDevFolder") || exit
+
+  # Extract the bundle ID
+  # Note: The key is always expected to be there (although it may have no value), so PlistBuddy should always report exit code 0, unless something fundamental goes wrong.
+  bundleId=$(/usr/libexec/PlistBuddy -c 'print "bundleid"' "$wfDevFolder/info.plist") || die
+
+  if [[ -n $bundleId ]]; then
+    echo "$bundleId"
+  else
+    echo "WARNING: NO BUNDLE ID defined in ${wfDevFolder/#$PWD/.}/info.plist" >&2
+  fi
+
+}
+
+# SYNOPSIS
+#   getWfInfo [-b] [-o fieldIdChars]
+getWfInfo() {
+
+  local folderOrBundleId wfsRootFolder wfFolder wfInstalledFolder plistFile fmtCmd isInstalled boolVals fieldIdChars val keyMissing
+
+  # Option-parameters loop.
+  local bare=0
+  while (( $# )); do
+    case $1 in
+      --) # Explicit end-of-options marker.
+        shift   # Move to next param and proceed with data-argument analysis below.
+        break
+        ;;
+      -o|--output-fields)
+        shift;
+        fieldIdChars=$1;
+        [[ -n $fieldIdChars ]] || dieSyntax "Missing list of field ID chars."        
+        ;;
+      -b|--bare)
+        bare=1
+        ;;
+      -?|--?*) # An unrecognized switch.
+        dieSyntax "Unrecognized option: '$1'. To force interpretation as non-option, precede with '--'."
+        ;;
+      *)  # 1st non-option argument reached; proceed below.
+        break
+        ;;
+    esac
+    shift
+  done
+
+  folderOrBundleId=${1:-.} # default to current folder.
+  shift
+
+  (( $# == 0 )) || dieSyntax "Unexpected number of arguments specified."
+
+  # Determine default output fields.
+  [[ -n $fieldIdChars ]] || fieldIdChars=$DEFAULT_FIELD_IDS_INFO
+
+  # Determine full path of workflow specified.
+  wfFolder='' isInstalled=0 wfsRootFolder=$(getInstalledWfsRootFolder)
+  if [[ -d $folderOrBundleId || $folderOrBundleId == */* ]]; then # folder specified
+    [[ -d $folderOrBundleId ]] || die "Workflow folder not found: $folderOrBundleId"
+    isWfFolder "$folderOrBundleId" || die "Folder does not contain an Alfred workflow: '${folderOrBundleId/#$PWD/.}'"
+    wfFolder=$(cd "$folderOrBundleId"; echo "$PWD")
+    # Test, if currently installed.
+    if isChild "$wfFolder" "$wfsRootFolder"; then
+      isInstalled=1
+      wfInstalledFolder=$wfFolder
+    else # a dev folder was specified; get its installed path, if any.
+      wfInstalledFolder=$(getSymlinkTo "$wfFolder" "$wfsRootFolder") && isInstalled=1
+    fi
+  else # bundle ID specified -> resolve to installed folder
+    wfFolder=$(getInstalledWfFolderByBundleId "$folderOrBundleId")
+    [[ -n $wfFolder ]] || die "Specified bundle ID not found among installed workflows: $folderOrBundleId"
+    isInstalled=1 # since a search by bundle ID only happens among *installed* workflows, the one found is by definition an installed one.
+    wfInstalledFolder=$wfFolder
+  fi
+
+  fmtCmd='cat'
+  if (( ! bare )); then
+    fmtCmd='expand -t 14'
+  fi
+
+  plistFile="$wfFolder/info.plist"
+  # If the workflow is currently installed, we pass the *installed* path to the plist file so as to ensure that the 'installedto' and 'linkedto' fields are properly set.
+  (( isInstalled )) && plistFile="$wfInstalledFolder/info.plist"
+
+  getWfFieldsAndValuesByIdChars "$fieldIdChars" "$plistFile" 
+
+  for (( i = 0; i < ${#fieldNames[@]}; i++ )); do
+    (( ! bare )) && printf '%s:\t' "${fieldNames[i]}"
+    printf '%s\n' "${fieldVals[i]}"
+  done | $fmtCmd
+
+}
+
+# SYNOPSIS
+#   moveToDevAndLink [wfInstalledFolderOrBundleID [wfNewDevFolder]]
+moveToDevAndLink() {
+
+  local wfInstalledFolderOrBundleID wfInstalledFolder wfNewDevFolder devFolderOk prompt errMsg startFolderClause startFolder symlinkPath
+
+  # Option-parameters loop.
+  local reveal=0
+  while (( $# )); do
+    case $1 in
+      --) # Explicit end-of-options marker.
+        shift   # Move to next param and proceed with data-argument analysis below.
+        break
+        ;;
+      -R|--reveal)
+        reveal=1
+        ;;
+      -?|--?*) # An unrecognized switch.
+        dieSyntax "Unrecognized option: '$1'. To force interpretation as non-option, precede with '--'."
+        ;;
+      *)  # 1st non-option argument reached; proceed below.
+        break
+        ;;
+    esac
+    shift
+  done
+
+  # Parse arguments.
+  case $# in
+    0|1)
+      wfInstalledFolderOrBundleID=${1:-.}
+      ;;
+    2)
+      wfInstalledFolderOrBundleID=$1
+      wfNewDevFolder=$2
+      ;;
+    *)
+      dieSyntax "Unexpected number of arguments specified."
+      ;;
+  esac
+
+  if [[ ! -d $wfInstalledFolderOrBundleID && $wfInstalledFolderOrBundleID != */* ]]; then # bundle ID specified, resolve to installed folder
+    wfInstalledFolder=$(getInstalledWfFolderByBundleId "$wfInstalledFolderOrBundleID")
+    [[ -n $wfInstalledFolder ]] || die "Specified bundle ID not found among installed workflows - no such workflow installed: $wfInstalledFolderOrBundleID"
+  else
+    # Verify existence of and obtain absolute path of explicit or implied dev workflow folder.
+    wfInstalledFolder=$(getAndVerifyInstalledWfFolder "$wfInstalledFolderOrBundleID") || exit
+  fi
+  [[ ! -L $wfInstalledFolder ]] || die "Specified workflow folder is (already) a *symlink* (dev workflow); expected regular folder: $wfInstalledFolder"
+
+  # [Prompt for] and verify eligibility of the target folder.
+  devFolderOk=0 prompt=0 errMsg= startFolderClause= startFolder=
+  [[ -z $wfNewDevFolder ]] && prompt=1
+  while (( ! devFolderOk )); do
+    if (( prompt )); then
+      startFolderClause=
+      [[ -n $startFolder ]] && startFolderClause="default location (\"$startFolder\" as POSIX file)"
+      wfNewDevFolder=$(osascript -e 'POSIX path of (choose folder with prompt "Create and Choose a Dev Folder - Pick a Descriptive Folder Name" '"$startFolderClause"' with invisibles)' 2>/dev/null) || { echo 'ABORTED.' >&2; exit 3; }
+    else
+      mkdir -p "$wfNewDevFolder" || die "Dev. folder could not be created: $wfNewDevFolder"
+    fi
+    if isInSubtree "$wfNewDevFolder" "$(getInstalledWfsRootFolder)"; then
+       errMsg="Invalid dev. folder specified: must not be in subtree of installed workflows: $wfNewDevFolder"
+       (( prompt )) || die "$errMsg"
+       echo "ERROR: $errMsg. Please try again."
+    elif ! isDirEmpty "$wfNewDevFolder"; then
+       errMsg="Invalid dev. folder specified: folder must be completely empty: $wfNewDevFolder"
+       (( prompt )) || die "$errMsg"
+       errMsg=$'ERROR:\n\n'"$errMsg."$'\n\nPlease try again.'
+       osascript -e 'tell application "SystemUIServer" to display alert "'"${errMsg//\"/\\\"}"'" as critical' -e 'activate application (path to frontmost application as text)'
+       echo "$errMsg" | tr '\n' ' ' >&2
+    else
+      devFolderOk=1
+    fi
+    startFolder="$wfNewDevFolder" # save path to pass to the GUI choose-folder prompt as the initial location on the next try for continuity
+  done
+
+  # Determine the full path of the symlink to create among the installed workflows...
+  symlinkPath="$(getInstalledWfsRootFolder)/$DEV_WF_NAMEPREFIX$(basename "$wfNewDevFolder")"
+  # ... and make sure it doesn't already exist.
+  [[ ! -e $symlinkPath ]] || die "Symlink to be created already exists: $symlinkPath"
+
+  # Copy *contents* of installed folder to dev folder.
+  cp -a "${wfInstalledFolder%/}/" "$wfNewDevFolder" || die "Failed to copy contents of '$wfInstalledFolder' to '$wfNewDevFolder'."
+
+  # Delete the original installed folder.
+  rm -rf "$wfInstalledFolder" || die "Failed to delete original installed folder: $wfInstalledFolder"
+
+  # Finally, symlink the new dev folder into the folder of installed workflows.
+  ln -s "$wfNewDevFolder" "$symlinkPath" || die "Failed to create a symlink to '$wfNewDevFolder' at '$symlinkPath'."
+
+  echo "Successfully moved installed workflow '${wfInstalledFolder/#$PWD/.}' to dev. location '$wfNewDevFolder' and created symlink to it at '$symlinkPath'."
+
+  (( reveal )) && open -R -- "$symlinkPath" || :
+
+}
+# SYNOPSIS
+#   moveFromDev [wfDevFolder]
+moveFromDev() {
+
+  local wfDevFolder wfInstFolder wfsRootFolder symlinkToRemove bundleId wfExistingInstFolde verb
+
+  # Option-parameters loop.
+  local keep=0
+  while (( $# )); do
+    case $1 in
+      --) # Explicit end-of-options marker.
+        shift   # Move to next param and proceed with data-argument analysis below.
+        break
+        ;;
+      -k|--keep)
+        keep=1
+        ;;
+      -?|--?*) # An unrecognized switch.
+        dieSyntax "Unrecognized option: '$1'. To force interpretation as non-option, precede with '--'."
+        ;;
+      *)  # 1st non-option argument reached; proceed below.
+        break
+        ;;
+    esac
+    shift
+  done
+
+  # Parse arguments.
+  case $# in
+    0|1)
+      wfDevFolder=${1:-.}
+      ;;
+    *)
+      dieSyntax "Unexpected number of arguments specified."
+      ;;
+  esac
+
+  verb='moved'
+  (( keep )) && verb='copied'
+
+  # Make sure the specified folder is a *dev* workflow folder and get its full path.
+  wfDevFolder=$(getAndVerifyDevWfFolder "$wfDevFolder") || exit
+
+  wfsRootFolder=$(getInstalledWfsRootFolder)
+
+  # See if the dev workflow is currently symlinked to from among the installed workflows
+  # and remove the symlink, if so.
+  # !! We do this BEFORE checking for duplicate bundle IDs and attempting to move/copy the folder contents.
+  symlinkToRemove=$(getSymlinkTo "$wfDevFolder" "$wfsRootFolder")
+  if [[ -n $symlinkToRemove ]]; then
+    rm "$symlinkToRemove" ||  die "Failed to remove existing symlink to the dev workflow folder: $symlinkToRemove"
+  fi
+
+  # As an additional safeguard, make sure that no existing installed workflow uses the same bundle ID.
+  bundleId=$(getWfBundleIdByFolder "$wfDevFolder")
+  [[ -n $bundleId ]] && wfExistingInstFolder=$(getInstalledWfFolderByBundleId "$bundleId")
+  [[ -z $wfExistingInstFolder ]] || die "Duplicate bundle ID: Specified dev workflow has bundle ID '$bundleId', but an installed workflow with that bundle ID already exists: $wfExistingInstFolder"
+
+  # Determine the path to the folder to use among the installed workflows,
+  # using `uuidgen` to incorporate a random, unique component.
+  wfInstFolder="$wfsRootFolder/$WF_NAMEPREFIX$(uuidgen)"
+  [[ ! -e $wfInstFolder ]] || die # This should never happen.
+
+  # Copy *contents* of dev folder to install folder.
+  cp -a "${wfDevFolder%/}/" "$wfInstFolder" || die "Failed to copy contents of '$wfDevFolder' to '$wfInstFolder'."
+
+  # Remove the original dev folder, unless requested not to.
+  if (( ! keep )); then
+    rm -rf "$wfDevFolder" || die "Failed to remove dev workflow folder: $wfDevFolder"
+  fi
+
+  echo "Successfully $verb contents of dev workflow '${wfDevFolder/#$PWD/.}' to installed-workflow location '$wfInstFolder'."
+
+}
+
+# SYNOPSIS
+#   unlinkDevFromInstalled wfFolderOrBundleId
+unlinkDevFromInstalled() {
+
+  local folderOrBundleId symlinkToRemove bundleId wfsRootFolder
+
+  # Option-parameters loop.
+  while (( $# )); do
+    case $1 in
+      --) # Explicit end-of-options marker.
+        shift   # Move to next param and proceed with data-argument analysis below.
+        break
+        ;;
+      -?|--?*) # An unrecognized switch.
+        dieSyntax "Unrecognized option: '$1'. To force interpretation as non-option, precede with '--'."
+        ;;
+      *)  # 1st non-option argument reached; proceed below.
+        break
+        ;;
+    esac
+    shift
+  done
+
+    # Parse arguments.
+  case $# in
+    0|1)
+      folderOrBundleId=${1:-.}
+      ;;
+    *)
+      dieSyntax "Unexpected number of arguments specified."
+      ;;
+  esac
+
+  bundleId=$folderOrBundleId
+  if [[ -d $folderOrBundleId || $folderOrBundleId == */* ]]; then # folder specified, resolve to bundle ID
+    [[ -d $folderOrBundleId ]] || die "Workflow folder not found: $folderOrBundleId"
+    isWfFolder "$folderOrBundleId" || die "Specified workflow folder does not contain an Alfred workflow: ${folderOrBundleId/#$PWD/.}"
+    wfsRootFolder=$(getInstalledWfsRootFolder)
+    if isChild "$folderOrBundleId" "$wfsRootFolder"; then # an installed workflow folder was directly specified      
+      symlinkToRemove=$(cd "$folderOrBundleId"; echo "$PWD")
+    else # dev workflow folder specified: find symlink to it among installed workflows
+      symlinkToRemove=$(getSymlinkTo "$folderOrBundleId" "$wfsRootFolder") || { echo "(Nothing to do: dev workflow folder is already not symlinked as an installed workflow: $folderOrBundleId)" >&2; exit 0; }
+    fi
+  else # bundle ID specified
+    symlinkToRemove=$(getInstalledWfFolderByBundleId "$bundleId")
+    [[ -n $symlinkToRemove ]] || die "Specified bundle ID not found among installed workflows - no such workflow installed: $bundleId"
+  fi
+      
+  [[ -L $symlinkToRemove ]] || die "Targeted installed workflow folder is not a symlink to a dev workflow folder: $symlinkToRemove"
+
+  rm "$symlinkToRemove" || die "Failed to remove symlink: $symlinkToRemove"
+
+  echo "Successfully unlinked dev workflow: $folderOrBundleId"
+}
+
+# SYNOPSIS
+#   pruneDeadSymlinks
+pruneDeadSymlinks() {
+
+  local wfsRootFolder count lnk orig
+
+  # Option-parameters loop.
+  local reveal=0 bare=0
+  while (( $# )); do
+    case $1 in
+      --) # Explicit end-of-options marker.
+        shift   # Move to next param and proceed with data-argument analysis below.
+        break
+        ;;
+      -?|--?*) # An unrecognized switch.
+        dieSyntax "Unrecognized option: '$1'. To force interpretation as non-option, precede with '--'."
+        ;;
+      *)  # 1st non-option argument reached; proceed below.
+        break
+        ;;
+    esac
+    shift
+  done
+
+  (( $# == 0 )) || dieSyntax "Unexpected arguments specified."
+
+  wfsRootFolder=$(getInstalledWfsRootFolder)
+
+  count=0
+  while IFS= read lnk; do
+    orig=$(readlink "$lnk")
+    if [[ ! -e $orig ]]; then
+        echo "Removing dead symlink: $lnk@ -> $orig"
+        rm "$lnk" || die
+        (( ++count ))
+    fi
+  done < <(find "$wfsRootFolder" -type l -mindepth 1 -maxdepth 1)
+
+  echo "$count symlink(s) pruned."
+}
+
+
+# SYNOPSIS
+#   linkDevToInstalled [-f] wfDevFolder
+linkDevToInstalled() {
+
+  local wfDevFolder wfRootFolder plistFile bundleId symlinkPath existingSymlinkPath existingWfFolder
+
+  # Option-parameters loop.
+  local force=0
+  while (( $# )); do
+    case $1 in
+      --) # Explicit end-of-options marker.
+        shift   # Move to next param and proceed with data-argument analysis below.
+        break
+        ;;
+      -f|--force)
+        force=1
+        ;;
+      -?|--?*) # An unrecognized switch.
+        dieSyntax "Unrecognized option: '$1'. To force interpretation as non-option, precede with '--'."
+        ;;
+      *)  # 1st non-option argument reached; proceed below.
+        break
+        ;;
+    esac
+    shift
+  done
+
+  # Parse arguments.
+  case $# in
+    0|1)
+      wfDevFolder=${1:-.}
+      ;;
+    *)
+      dieSyntax "Unexpected number of arguments specified."
+      ;;
+  esac
+
+  # Verify existence of and obtain absolute path of explicit or implied dev workflow folder.
+  wfDevFolder=$(getAndVerifyDevWfFolder "$wfDevFolder") || exit
+
+  # Next, extract the bundle ID from the 'info.plist' file in the workflow folder, if present.
+  plistFile="$wfDevFolder/info.plist"
+  bundleId=$(/usr/libexec/PlistBuddy -c 'print "bundleid"' "$plistFile")
+  [[ -n $bundleId ]] || echo "WARNING: No bundle ID defined in: ${plistFile/#$PWD/.}" >&2
+
+  # Determine the root location of all installed workflows.
+  wfRootFolder=$(getInstalledWfsRootFolder)
+  [[ -d $wfRootFolder ]] || die "Root folder of installed workflows stored in Alfred's preferences doesn't exist: $wfRootFolder"
+
+  # Construct the full symlink path.
+  symlinkPath="$wfRootFolder/$DEV_WF_NAMEPREFIX$(basename "$wfDevFolder")"
+
+  # See if a symlink to *this* dev. folder already exists among the installed workflows.
+  existingSymlinkPath=$(getSymlinkTo "$wfDevFolder" "$wfRootFolder") # Note: This may or may not be the same as $symlinkPath.
+  if [[ -n $existingSymlinkPath ]]; then # symlink to *this* dev. folder already exists, potentially under a different name
+    # Unless forced, we're done. Note: Forcing still makes sense, because the existing symlink could have a nonstandard name that one might want to standardize.
+    (( force )) || { echo "(Nothing to do: Dev workflow folder '${wfDevFolder/#$PWD/.}' already symlinked as '$existingSymlinkPath'; use -f to force recreation.)" >&2; exit 0; }
+  elif [[ -L $symlinkPath ]]; then # target symlink already exists, but *points elsewhere*
+    (( force )) || die "Symlink '$symlinkPath' already exists, but points to '$(readlink "$symlinkPath")' instead; to force replacement, use -f."
+  fi
+
+    # If we get here and the symlink already exists, the force option must have been specified.
+    # Remove the symlink now, and re-create it below. 
+    # !! This is required, because using `ln -f -s` would *follow* the *existing* symlink and thus create the new link not where we want.
+    # !! Also, by removing first we avoid finding this old symlink when searching for any workflows with the bundle ID at hand below.
+  [[ -L "$symlinkPath" ]] && { rm "$symlinkPath" || die; }
+
+  # Next, ensure that no existing installed workflow (whether an actual folder or symlink) uses the same bundle ID.
+  if [[ -n $bundleId ]]; then
+    existingWfFolder=$(getInstalledWfFolderByBundleId "$bundleId")
+    [[ -z $existingWfFolder ]] || die "Existing installed workflow already uses bundle ID '$bundleId'; please resolve conflict manually: $existingWfFolder"
+  fi
+
+  # Finally, create (or re-create, if forced) the symlink.
+  ln -s "$wfDevFolder" "$symlinkPath" || die
+
+  echo "Successfully created symlink at '$symlinkPath' to '${wfDevFolder/#$PWD/.}'."
+}
+
+
+# SYNOPSIS
+#   getInstalledWfFolder [-l|-P] [-R]  wfFolderOrBundleId
+# DESCRIPTION
+#   Implements the `which` and `reveal` commands
+getInstalledWfFolder() {
+
+  local folderOrBundleId wfFolder wfDevFolder bundleId wfsRootFolder
+
+  # Options loop.
+  local reveal=0 showSymlinkChain=0 useDevFolder=0
+  while (( $# )); do
+    case $1 in
+      --) # Explicit end-of-options marker.
+        shift   # Move to next param and proceed with data-argument analysis below.
+        break
+        ;;
+      -l)
+        showSymlinkChain=1
+        ;;        
+      -P)
+        useDevFolder=1
+        ;;
+      -R|--reveal)
+        reveal=1
+        ;;
+      -?|--?*) # An unrecognized switch.
+        dieSyntax "Unrecognized option: '$1'. To force interpretation as non-option, precede with '--'."
+        ;;
+      *)  # 1st non-option argument reached; proceed below.
+        break
+        ;;
+    esac
+    shift
+  done
+
+  (( ! (showSymlinkChain && useDevFolder) )) || dieSyntax "Incompatible options specified."
+
+    # Parse arguments.
+  case $# in
+    0|1)
+      folderOrBundleId=${1:-.}
+      ;;
+    *)
+      dieSyntax "Unexpected number of arguments specified."
+      ;;
+  esac
+
+  # Special case: if the argument specified is '/' we simply print the ROOT folder of all installed workflows
+  if [[ $folderOrBundleId == '/' ]]; then
+    (( ! (showSymlinkChain || useDevFolder) )) || dieSyntax "Inapplicable options specified."
+    wfFolder=$(getInstalledWfsRootFolder)
+  else # dev workflow folder specified or implied, or bundle ID specified
+    # Determine full path of workflow specified.
+    bundleId=$folderOrBundleId
+    if [[ -d $folderOrBundleId || $folderOrBundleId == */* ]]; then # folder specified, resolve to bundle ID
+      [[ -d $folderOrBundleId ]] || die "Workflow folder not found: $folderOrBundleId"
+      isWfFolder "$folderOrBundleId" || die "Specified workflow folder does not contain an Alfred workflow: ${folderOrBundleId/#$PWD/.}"
+      wfsRootFolder=$(getInstalledWfsRootFolder)
+      if isChild "$folderOrBundleId" "$wfsRootFolder"; then # an installed workflow folder was directly specified - essentially, a noop (except for resolving to an absolute path )
+        wfFolder=$(cd "$folderOrBundleId"; echo "$PWD")
+      else # dev workflow folder specified: find symlink to it among installed workflows
+        wfFolder=$(getSymlinkTo "$folderOrBundleId" "$wfsRootFolder") || die "Dev workflow folder is not symlinked as an installed workflow: $folderOrBundleId"
+      fi
+    else # bundle ID specified
+      wfFolder=$(getInstalledWfFolderByBundleId "$bundleId")
+      [[ -n $wfFolder ]] || die "Specified bundle ID not found among installed workflows - no such workflow installed: $bundleId"
+    fi
+  fi
+
+  # Print the folder path.
+  if (( showSymlinkChain )) && [[ -L $wfFolder ]]; then # If the folder is a symlink, print the chain of symlinks `ls -l` style (a@ -> b)
+    rreadlinkchain  "$wfFolder" | sed -nE -e '$!{a\'$'\n''@ -> ' -e '}; p' | tr -d '\n'
+  else
+    if (( useDevFolder )) && [[ -L $wfFolder ]]; then # if requested, resolve to underlying dev folder
+      wfFolder=$(rreadlinkchain "$wfFolder" | tail -1)
+    fi
+    printf '%s' "$wfFolder"
+  fi
+  printf '\n'
+
+  # Note that we purposely use `open -R` so as to reveal the folder itself in the context of its parent rather than just using
+  # `open`, which would show the *contents* of the folder in its *original* location, because Finder invariably resolves symlinks.
+  (( reveal )) && open -R -- "$wfFolder" || :
+
+}
+
+# SYNOPSIS
+#  changeToWfFolderInNewTerminalTab wfFolderOrBundleID
+changeToWfFolderInNewTerminalTab() {
+
+  local folderOrBundleId wfFolder bundleId wfsRootFolder
+
+  # Options loop.        
+  local resolveToOriginal=0
+  while (( $# )); do
+    case $1 in
+      --) # Explicit end-of-options marker.
+        shift   # Move to next param and proceed with data-argument analysis below.
+        break
+        ;;
+      -P)
+        resolveToOriginal=1
+        ;;
+      -?|--?*) # An unrecognized switch.
+        dieSyntax "Unrecognized option: '$1'. To force interpretation as non-option, precede with '--'."
+        ;;
+      *)  # 1st non-option argument reached; proceed below.
+        break
+        ;;
+    esac
+    shift
+  done
+
+    # Parse arguments.
+  case $# in
+    0|1)
+      folderOrBundleId=${1:-.}
+      ;;
+    *)
+      dieSyntax "Unexpected number of arguments specified."
+      ;;
+  esac
+
+  # Special case: if the argument specified is '/' we simply target the ROOT folder of all installed workflows
+  if [[ $folderOrBundleId == '/' ]]; then
+    wfFolder=$(getInstalledWfsRootFolder)
+  else # dev workflow folder specified or implied, or bundle ID specified
+    # Determine full path of workflow specified.
+    bundleId=$folderOrBundleId
+    if [[ -d $folderOrBundleId || $folderOrBundleId == */* ]]; then # folder specified, resolve to bundle ID
+      [[ -d $folderOrBundleId ]] || die "Workflow folder not found: $folderOrBundleId"
+      isWfFolder "$folderOrBundleId" || die "Specified workflow folder does not contain an Alfred workflow: ${folderOrBundleId/#$PWD/.}"
+      wfsRootFolder=$(getInstalledWfsRootFolder)
+      if isChild "$folderOrBundleId" "$wfsRootFolder"; then # an installed workflow folder was directly specified - essentially, a noop (except for resolving to an absolute path and also printing the dev path)
+        wfFolder=$(cd "$folderOrBundleId"; echo "$PWD")
+      else # dev workflow folder specified: find symlink to it among installed workflows
+        wfFolder=$(getSymlinkTo "$folderOrBundleId" "$wfsRootFolder") || die "Dev workflow folder is not symlinked as an installed workflow: $folderOrBundleId"
+      fi
+    else # bundle ID specified
+      wfFolder=$(getInstalledWfFolderByBundleId "$bundleId")
+      [[ -n $wfFolder ]] || die "Specified bundle ID not found among installed workflows - no such workflow installed: $bundleId"
+    fi
+  fi
+
+  if (( resolveToOriginal )); then
+    wfFolder=$(cd "$wfFolder"; pwd -P)
+  fi
+
+  # Use AppleScript to open a new Terminal.app window.
+  # Note: we assume that $wfFolder contains neither " nor \ instances, so no escaping is applied.
+  osascript <<EOF  >/dev/null
+    tell application "Terminal"
+      do script "cd " & quoted form of "$wfFolder"
+    end tell
+EOF
+
+}
+
+# SYNOPSIS
+#  editWf [wfFolderOrBundleId]
+editWf() {
+
+  # Option-parameters loop.
+  while (( $# )); do
+    case $1 in
+      --) # Explicit end-of-options marker.
+        shift   # Move to next param and proceed with data-argument analysis below.
+        break
+        ;;
+      -?|--?*) # An unrecognized switch.
+        dieSyntax "Unrecognized option: '$1'. To force interpretation as non-option, precede with '--'."
+        ;;
+      *)  # 1st non-option argument reached; proceed below.
+        break
+        ;;
+    esac
+    shift
+  done
+
+  folderOrBundleId=${1:-.}  # default to current folder.
+  shift 
+
+  # Make sure that not too many parameters were specified.
+  (( $# == 0 )) || dieSyntax "Unexpected argument(s) specified."
+
+  # Special case: if the argument specified is '/' we simply open the Workflows tab in Alfred Preferences without searching.
+  if [[ $folderOrBundleId == '/' ]]; then
+    wfName=''
+  else # workflow folder specified or implied, or bundle ID specified
+    # Determine full path of workflow specified.
+    bundleId=$folderOrBundleId
+    if [[ -d $folderOrBundleId || $folderOrBundleId == */* ]]; then # folder specified, resolve to bundle ID
+      [[ -d $folderOrBundleId ]] || die "Workflow folder not found: $folderOrBundleId"
+      isWfFolder "$folderOrBundleId" || die "Folder does not contain an Alfred workflow: '${folderOrBundleId/#$PWD/.}'"
+      bundleId=$(getWfBundleIdByFolder)
+    fi
+
+    wfFolder=$(getInstalledWfFolderByBundleId "$bundleId")
+    [[ -n $wfFolder ]] || die "Bundle ID not found among installed workflows: '$bundleId'"
+    wfName=$(getWfInfo -b -o n "$wfFolder") || die
+  fi
+
+  # !! Given that we can't reveal a workflow by bundle ID in Alfred Preferences, the best we can do is to search by its full name
+  # !! and hope that the target workflow is the only match - which will typically, but not always, work.
+  searchForWfsInAlfredPrefs "$wfName"
+
+}
+
+# SYNOPSIS
+#  searchForWfs [searchTerm]
+searchForWfs() {
+
+  # Option-parameters loop.
+  while (( $# )); do
+    case $1 in
+      --) # Explicit end-of-options marker.
+        shift   # Move to next param and proceed with data-argument analysis below.
+        break
+        ;;
+      -?|--?*) # An unrecognized switch.
+        dieSyntax "Unrecognized option: '$1'. To force interpretation as non-option, precede with '--'."
+        ;;
+      *)  # 1st non-option argument reached; proceed below.
+        break
+        ;;
+    esac
+    shift
+  done
+
+  searchForWfsInAlfredPrefs "$*" # !! as a courtesy, we allow multiple search terms, which we pass on as a single string
+
+}
+
+
+# SYNOPSIS
+#   listWfs [-b] [-o fieldIdChars]
+listWfs() {
+
+  local mustFilter searchTerm fieldIdChars outputFieldIdChars searchFieldIdChars outputFieldCount sortCmd fmtCmd tabPositions i searchValueIndices wfsRootFolder isMatch anyMatches
+
+  # Option-parameters loop.
+  local bare=0 exactMatching=0 regexMatching=0
+  while (( $# )); do
+    case $1 in
+      --) # Explicit end-of-options marker.
+        shift   # Move to next param and proceed with data-argument analysis below.
+        break
+        ;;
+      -b|--bare)
+        bare=1
+        ;;
+      -o|--output-fields)
+        shift;
+        outputFieldIdChars=$1;
+        [[ -n $outputFieldIdChars ]] || dieSyntax "Missing list of output field ID chars."
+        ;;
+      -s|--search-fields)
+        shift;
+        searchFieldIdChars=$1;
+        [[ -n $searchFieldIdChars ]] || dieSyntax "Missing list of search-field ID chars."
+        ;;
+      -x|--exact-match)
+        exactMatching=1
+        ;;
+      -r|--regex)
+        regexMatching=1
+        ;;
+      -?|--?*) # An unrecognized switch.
+        dieSyntax "Unrecognized option: '$1'. To force interpretation as non-option, precede with '--'."
+        ;;
+      *)  # 1st non-option argument reached; proceed below.
+        break
+        ;;
+    esac
+    shift
+  done
+
+  # See if a search term was specified.
+  searchTerm=$1
+  mustFilter=0
+  [[ -n $searchTerm ]] && mustFilter=1
+  shift
+
+  (( ! (exactMatching && regexMatching) )) || dieSyntax 'Incompatible options specified.'
+
+  (( $# == 0 )) || dieSyntax "Unexpected arguments specified."
+
+  # Determine default output fields.
+  [[ -n $outputFieldIdChars ]] || outputFieldIdChars=$DEFAULT_FIELD_IDS_LIST
+  outputFieldCount=${#outputFieldIdChars}
+
+  # Determine default search fields.
+  [[ -n $searchFieldIdChars ]] || searchFieldIdChars='n'
+
+  fieldIdChars=$outputFieldIdChars
+  (( mustFilter )) && fieldIdChars=$(mergeCharLists "$outputFieldIdChars" "$searchFieldIdChars")
+
+  # Get the indices into the global FIELD_* arrays for the output fields.
+  # This fills *global* arrays named field*: fieldNames fieldWidths fieldIndices
+  getWfFieldsAndValuesByIdChars "$fieldIdChars"
+
+  # Output Sorting:
+  # For simplicity, simply sort by the first output field.
+  # !! If the *folder name* happens to be the first field, there's no strict
+  # !! need to sort, as the output is then already sorted by folder name; however, the output would be choppy, because lines are output one
+  # !! by one. By contrast, with a sort command involved, there's an initial delay, followed by output 'all at once', which is preferable.
+  # !! For consistency we therefore *always sort*.
+  sortCmd=(sort -f -t$'\t' -k1,1)
+
+  # Output formatting:
+  # Unless bare output is requested, TRY to use column-aligned output - because of unbounded field lengths, this will not always work.
+  if (( bare )); then
+    fmtCmd=(cat)
+  else
+    tabPositions=(${fieldWidths[0]})
+    for (( i = 1; i < $outputFieldCount; i++ )); do
+      tabPositions+=( $(( ${tabPositions[i-1]} + ${fieldWidths[i]} + 2 )) )
+    done
+    fmtCmd=(expand -t "$(IFS=','; echo "${tabPositions[*]}")")
+  fi
+
+  if (( mustFilter )); then
+    searchValueIndices=()
+    for (( i = 0; i < ${#searchFieldIdChars}; i++ )); do
+      searchValueIndices+=( $(indexOfSubstr "${searchFieldIdChars:i:1}" "$fieldIdChars") )
+    done
+  fi
+
+  # Loop over all installed workflows' 'info.plist' files.
+  shopt -s nocasematch  # We want all searching/filtering to be case-INsensitive.
+  {
+    # Print header, unless bare output is requested.
+    if (( ! bare )); then
+        # If applicable, trim trailing search-only fields from header.
+        (( mustFilter )) && { fieldNames=("${fieldNames[@]: 0:outputFieldCount}"); fieldHeaderDivs=("${fieldHeaderDivs[@]: 0:outputFieldCount}"); } 
+        echo "$(IFS=$'\t'; echo "${fieldNames[*]}"; echo "${fieldHeaderDivs[*]}";)"
+    fi
+
+    # Print fields for each workflow.
+    wfsRootFolder=$(getInstalledWfsRootFolder)
+    for f in "$wfsRootFolder/"*"/info.plist"; do
+
+      getWfFieldValuesByIndices "$f" "${fieldIndices[@]}"
+
+      if (( mustFilter )); then
+
+        isMatch=0
+        for i in "${searchValueIndices[@]}"; do
+          if (( exactMatching )); then
+            [[ "${fieldVals[i]}" == "$searchTerm" ]] && { isMatch=1; break; }
+          elif (( regexMatching )); then
+            [[ "${fieldVals[i]}" =~ $searchTerm ]] && { isMatch=1; break; }
+          else
+            [[ "${fieldVals[i]}" == *"$searchTerm"* ]] && { isMatch=1; break; }
+          fi
+        done
+        (( isMatch )) || continue
+
+        # Trim trailing search-only field values.
+        fieldVals=("${fieldVals[@]: 0:outputFieldCount}")
+      fi
+
+      echo "$(IFS=$'\t'; echo "${fieldVals[*]}")"
+
+      anyMatches=1
+
+    done | LC_ALL=C "${sortCmd[@]}" # !! Sadly, to prevent locale-related sort errors with case-insensitive sorting, we must use LC_ALL=C.
+  }  | "${fmtCmd[@]}"
+  shopt -u nocasematch
+
+  (( anyMatches )) || exit 1
+
+}
+
+# SYNOPSIS
+#   wfVersion [-f] [wfFolderOrBundleId [newVersion|'major|'minor'|'patch']]
+# DESCRIPTION
+#   Returns or sets the workflow's version number.
+#   Specifying just a folder or no argument at all (folder defaults to current folder) outputs the current version; fails, if there is none.
+#
+#   A workflow's version number is by convention stored in a plain-text file named 'version' in the workflow's folder.
+#   The file must without exception contain a version number only, and the file must have 1 line only; no whitespace allowed.
+#
+#   Version numbers can have 1-3 .-separated components, and each component must be composed of digits only.
+#   The component names are: major, minor, and patch.
+#   
+#   As an alternative to directly specifying a new version number, an increment specifier may be used.
+#   Supported increment specifiers are 'major', 'minor', 'patch', which increment (by 1) the respective version component of
+#   the current version number.
+#   Any lower components are set as follows: the minor component is set to 0, the patch component is omitted (implies 0).
+#   Caveat: any 0-padding of components is lost in the process.
+#
+wfVersion() {
+  
+  local folderOrBundleId bundleId wfFolder newVersion verFile currVersion haveCurrVersion=0 printOnly=0 currMajor currMinor currPatch newMajor newMinor newPatch
+  local reVerComponents='^([0-9]+)(\.([0-9]+)(\.([0-9]+))?)?$'
+
+  # Options loop.        
+  local force=0
+  while (( $# )); do
+    case $1 in
+      --) # Explicit end-of-options marker.
+        shift   # Move to next param and proceed with data-argument analysis below.
+        break
+        ;;
+      -f|--force)
+        force=1
+        ;;
+      -?|--?*) # An unrecognized switch.
+        dieSyntax "Unrecognized option: '$1'. To force interpretation as non-option, precede with '--'."
+        ;;
+      *)  # 1st non-option argument reached; proceed below.
+        break
+        ;;
+    esac
+    shift
+  done
+
+    # Parse arguments.
+  case $# in
+    0|1|2)
+      folderOrBundleId=${1:-.}
+      newVersion=$2
+      ;;
+    *)
+      dieSyntax "Unexpected number of arguments specified."
+      ;;
+  esac
+
+  # Determine path of workflow specified.
+  if [[ -d $folderOrBundleId || $folderOrBundleId == */* ]]; then # folder specified, resolve to bundle ID
+    [[ -d $folderOrBundleId ]] || die "Workflow folder not found: $folderOrBundleId"
+    isWfFolder "$folderOrBundleId" || die "Specified workflow folder does not contain an Alfred workflow: ${folderOrBundleId/#$PWD/.}"
+    wfFolder=$folderOrBundleId
+  else # bundle ID specified
+    wfFolder=$(getInstalledWfFolderByBundleId "$folderOrBundleId")
+    [[ -n $wfFolder ]] || die "Specified bundle ID not found among installed workflows - no such workflow installed: $bundleId"
+  fi
+
+  [[ -n $newVersion ]] || printOnly=1
+
+  verFile="$wfFolder/version"
+
+  # Read current version number, if defined.
+  [[ -f $verFile ]] && currVersion=$(<"$verFile")
+  [[ -n $currVersion ]] && haveCurrVersion=1
+
+  if (( printOnly )); then
+    (( haveCurrVersion )) || { echo "Version file missing or empty: $verFile" >&2; return 2; } 
+    echo "$currVersion"
+    return 0 # We're done.
+  fi
+
+  # Getting here means that a new version number must be assigned.
+
+  # Parse the current version
+  if (( haveCurrVersion )); then
+    [[ $currVersion =~ $reVerComponents ]] || (( force )) || die "Current version is not a valid version number; -f to ignore: $currVersion"
+    currMajor=${BASH_REMATCH[1]}
+    currMinor=${BASH_REMATCH[3]}
+    currPatch=${BASH_REMATCH[5]}
+    # pv currMajor currMinor currPatch
+  fi
+
+  case "$(tr '[:upper:]' '[:lower:]' <<<"$newVersion")" in
+    'major')
+      newMajor=$(( 10#${currMajor:-0} + 1 )) # !! Prefix '10#' ensures numbers such as 010 aren't interpreted as octal numbers.
+      newMinor=0
+      newVersion=$newMajor.$newMinor
+      ;;
+    'minor')
+      newMajor=${currMajor:-0}
+      newMinor=$(( 10#${currMinor:-0} + 1 ))
+      newVersion=$newMajor.$newMinor
+      ;;
+    'patch')
+      newMajor=${currMajor:-0}
+      newMinor=${currMinor:-0}
+      newPatch=$(( 10#${currPatch:-0} + 1 ))
+      newVersion=$newMajor.$newMinor.$newPatch
+      ;;
+    *)
+      [[ $newVersion =~ $reVerComponents ]] || (( force )) || die "New version is neither a valid version number nor an increment specifier; -f to ignore: $newVersion" 3
+      newMajor=${BASH_REMATCH[1]}
+      newMinor=${BASH_REMATCH[3]}
+      newPatch=${BASH_REMATCH[5]}
+      if (( ! force && haveCurrVersion )); then
+        # Ensure that the new version is not lower than the current one.
+        vercomp "$newVersion" "$currVersion"
+        (( $? == 1 )) || die "New version is lower than or identical to current version; -f to ignore: $newVersion < $currVersion" 3
+      fi
+      ;;
+  esac
+
+  # pv currVersion newVersion
+  echo "$newVersion" > "$verFile" || die
+
+
+  (( haveCurrVersion )) && echo "Version number changed from $currVersion to $newVersion" || echo "Version number set to: $newVersion"
+
+}
+
+# --- END: Main command-implementing functions
+
+
+# Store the command name and exit, if none specified.
+cmd=$1; shift
+[[ -n $cmd ]] || dieSyntax "Missing command."
+
+# As a courtesy, we also accept the syntax 
+#   awf <command> -h|--help 
+# as an alternative to 
+#   awf help <command>
+case "$1" in
+  -h|--help)
+    cliHelp "$cmd"
+    exit 0
+    ;;
+esac
+
+# Preprocess remaining: expand compressed options to individual options; e.g., '-ab' to '-a -b'
+params=() decompressed=0 argsReached=0
+for p; do
+  if [[ $argsReached -eq 0 && $p =~ ^-[a-zA-Z0-9]+$ ]]; then # compressed options?
+    decompressed=1
+    params+=(${p:0:2})
+    for (( i = 2; i < ${#p}; i++ )); do
+        params+=("-${p:$i:1}")
+    done
+  else
+    (( argsReached && ! decompressed )) && break
+    [[ $p == '--' || ${p:0:1} != '-' ]] && argsReached=1
+    params+=("$p")
+  fi
+done
+(( decompressed )) && set -- "${params[@]}"; unset params decompressed argsReached p # Replace "$@" with the expanded parameter set.
+
+# Dispatch to main functions based on command.
+# Note: As a courtesy, we ignore case in command names (only).
+case $(tr '[:upper:]' '[:lower:]' <<<"$cmd") in
+  install)    
+    installWf "$@"
+    ;;
+  export)
+    exportWf "$@"
+    ;;
+  link|ln)
+    linkDevToInstalled "$@"
+    ;;
+  unlink|unln)
+    unlinkDevFromInstalled "$@"
+    ;;
+  prune)
+    pruneDeadSymlinks "$@"
+    ;;
+  todev)
+    moveToDevAndLink "$@"
+    ;;
+  fromdev)
+    moveFromDev "$@"
+    ;;
+  edit)
+    editWf "$@"
+    ;;
+  search)
+    searchForWfs "$@"
+    ;;
+  which)
+    getInstalledWfFolder "$@"
+    ;;
+  cd)
+    changeToWfFolderInNewTerminalTab "$@"
+    ;;
+  reveal)
+    getInstalledWfFolder -R "$@" >/dev/null
+    ;;
+  id)
+    getWfInfo -b -o i "$@"
+    ;;
+  info)
+    getWfInfo "$@"
+    ;;
+  list|ls)
+    listWfs "$@"
+    ;;
+  help)
+    cliHelp "$@"
+    ;;
+  version)
+    wfVersion "$@"
+    ;;
+  -v|--version)
+    echo "$THIS_NAME $THIS_VERSION"
+    ;;
+  *)
+    dieSyntax "Unrecognized command: '$cmd'."
+esac

@@ -1,0 +1,24 @@
+{
+  "name": "awf",
+  "version": "0.0.0",
+  "os": "darwin",
+  "description": "CLI for managing Alfred workflows",
+  "bin": "bin/awf",
+  "preferGlobal": true,
+  "scripts": {
+    "test": "make test"
+  },
+  "keywords": [
+    "Alfred",
+    "workflow",
+    "CLI"
+  ],
+  "author": "Michael Klement <mklement0@gmail.com> (http://same2u.net)",
+  "license": "MIT",
+  "devDependencies": {
+    "json": "^9.0.2",
+    "replace": "^0.3.0",
+    "semver": "^4.1.0",
+    "urchin": "git://github.com/mklement0/urchin"
+  }
+}

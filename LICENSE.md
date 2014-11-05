@@ -1,0 +1,1 @@
+Copyright (c) 2014 Michael Klement, released under the [MIT license](http://opensource.org/licenses/MIT).
