@@ -45,6 +45,6 @@ else
    npm version $$newVer --no-git-tag-version >/dev/null || exit; \
 	 replace --silent '^(THIS_VERSION=).*$$' '$$1'$$newVer bin/awf || exit; \
 	 newTag=v$$newVer; \
-	 echo git commit -a -m "$$newTag" && echo git tag -a -m "$$newTag" "$$newTag" || exit; \
+	 git commit -a -m "$$newTag" && git tag -a -m "$$newTag" "$$newTag" || exit; \
 	 echo "Version bumped to $$newVer; changes committed and tagged $$newTag."
 endif	
