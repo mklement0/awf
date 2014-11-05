@@ -2,7 +2,7 @@
 
 THIS_NAME=$(basename "$BASH_SOURCE")
 # Note: the following line is automatically updated by `make version VERSION=<new-version>`
-THIS_VERSION=0.0.1-0
+THIS_VERSION=0.0.1-1
 
 # Helper function for exiting with error message due to runtime error.
 #   die [errMsg [exitCode]]
