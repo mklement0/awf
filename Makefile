@@ -2,7 +2,7 @@
 SHELL := bash
 	# Add the local npm packages' bin folder to the PATH, so that `make` can find them even when invoked directly (not via npm).
 	# !! Note that this extended path only takes effect in (a) recipe commands that are (b) true shell commands (not optimized away) - when in doubt, simply append ';'
-	# !! To use the extended path in $(shell ...) function calls, use $(shell PATH="$(PATH)" ...),
+	# !! To also use the extended path in $(shell ...) function calls, use $(shell PATH="$(PATH)" ...),
 export PATH := ./node_modules/.bin:$(PATH)
 	# Sanity check to make sure supporting utilites (and npm) are installed.
 UTILS := replace semver json urchin
@@ -32,27 +32,25 @@ endif
 _ensure-git-flow:
 	@git flow version &>/dev/null || { echo "Please ensure that the git-flow git extension is installed - https://github.com/petervanderdoes/gitflow." >&2; exit 2; }
 
-# Increments the version number, commits the changes and creates an annotated tag with the version number.
+# Increments the version number in source files and package.json.
 .PHONY: version
-version: _ensure-git-flow _ensure-clean update-readme
+version: # _ensure-git-flow _ensure-clean update-readme
 ifndef NEW
-	@json -f package.json version;	# output the current version
-	@printf 'Note:\tTo increment the version number and commit & tag, ensure that the workspace is clean, then run:\n\t\tmake version NEW=<new-version>\n\twhere <new-version> is either an increment specifier (patch, minor, major,\n\tprepatch, preminor, premajor, prerelease), or an explicit <major>.<minor>.<patch> version number.\n'
+	@printf 'Current version:\n\tv%s (from package.json)\n\t%s (from git tag)\n' `json -f package.json version` `oldVer=$$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*'); echo "$${oldVer:-v0.0.0}"`
+	@printf 'Note:\tTo increment the version number, run:\n\t\tmake version NEW=<new-version>\n\twhere <new-version> is either an increment specifier (patch, minor, major,\n\tprepatch, preminor, premajor, prerelease), or an explicit <major>.<minor>.<patch> version number.\n'
 else
-	@oldVer=`json -f package.json version` || exit; \
+	@oldVer=`git tag -l 'v[0-9]*.[0-9]*.[0-9]*'` || exit; oldVer=$${oldVer:-0.0.0}; oldVer=$${oldVer#v} \
 	 newVer=`echo "$(NEW)" | sed 's/^v//'`; \
 	 if printf "$$newVer" | grep -q '^[0-9]'; then \
-	   semver "$$newVer" >/dev/null || { echo 'Invalid version number specified: $(NEW) - must be major.minor.patch' >&2; exit 2; }; \
+	   semver "$$newVer" >/dev/null || { echo 'Invalid semver version number specified: $(NEW)' >&2; exit 2; }; \
 	   semver -r "> $$oldVer" "$$newVer" >/dev/null || { echo 'Invalid version number specified: $(NEW) - must be HIGHER than $$oldVer.' >&2; exit 2; } \
 	 else \
 	   newVer=`semver -i "$$newVer" "$$oldVer"` || { echo 'Invalid version-increment specifier: $(NEW)' >&2; exit 2; } \
 	 fi; \
-	 printf "=== ABOUT TO BUMP NEW:\n\t**$$oldVer** -> **$$newVer**\n=== before COMMITTING AND TAGGING.\nType 'proceed' to proceed, anything else to abort: " && read response && [ "$$response" = 'proceed' ] || { echo 'Aborted.' >&2; exit 2; };  \
+	 printf "=== ABOUT TO BUMP VERSION:\n\t**$$oldVer** -> **$$newVer**\n===\nType 'proceed' to proceed, anything else to abort: " && read response && [ "$$response" = 'proceed' ] || { echo 'Aborted.' >&2; exit 2; };  \
+	 replace "v$$oldVer" "v$$newVer" .  -r --exclude='.git,node_modules,test,Makefile' || exit; \
    npm version $$newVer --no-git-tag-version >/dev/null || exit; \
-	 replace --silent '^(THIS_NEW=).*$$' '$$1'"$$newVer" bin/awf || exit; \
-	 newTag=v$$newVer; \
-	 git commit -a -m "$$newTag" && git tag -a -m "$$newTag" "$$newTag" || exit; \
-	 echo "Version bumped to $$newVer; changes committed and tagged $$newTag."
+	 echo "Version bumped to [v]$$newVer in source files and package.json."
 endif	
 
 
