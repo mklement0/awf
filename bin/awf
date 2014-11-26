@@ -61,6 +61,9 @@ cliHelp() {
 
   [[ $cmd =~ ^[aA][lL][lL]$ ]] && all=1
 
+  # !! The following heredoc is parsed below and is expected to have:
+  # !!   - exactly 1 line per subcommand
+  # !!   - a matching details heredoc defined below.
   IFS= read -d '' -r synopses <<EOF
   $THIS_NAME list|ls [-b] [-o fieldIdChars] [[-s fieldIdChars] [-x|-r] searchTerm]
     Lists installed workflows, optionally with custom output and filtering.
@@ -99,9 +102,7 @@ cliHelp() {
   $THIS_NAME version [-f] [wfFolderOrBundleId [newVersion|'major|'minor'|'patch']]
     Prints or assigns a workflow's version number.
 
-  $THIS_NAME help [all]
-  $THIS_NAME help command
-  $THIS_NAME command -h
+  $THIS_NAME help [command | 'all']  # or: $THIS_NAME command -h
     Prints help information.
 EOF
 
@@ -146,9 +147,10 @@ EOF
       cmds=$cmd
     fi
 
+    # !! Every subcommand from the synopses above is expected to have a case branch with detailed information.
     for cmd in $cmds; do
 
-      (( all )) && echo $'\n--------'
+      (( all )) && echo $'\n~~~'  # !! Do not choose a separator that happens to be a heading in Markdown.
 
       egrep -i -A 1 "\s+$THIS_NAME .*\<$cmd\>" <<<"$synopses" || die "Command not found: $cmd"
 
