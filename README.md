@@ -25,8 +25,6 @@
 
 ## Usage
 
-???
-
 ```shell
 $ awf help all
 
@@ -531,8 +529,8 @@ EXAMPLES
   awf info -h  # same as above
 ```
 
+<!-- DO NOT CHANGE THE NEXT LINE - `make` tasks rely on it to update README.md -->
 ## Changelog
-<!-- DO NOT CHANGE THE LINE ABOVE - `make` tasks rely on it to update README.md -->
 
 * **v0.0.2** (2014-11-07)
     * some fix

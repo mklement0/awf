@@ -19,7 +19,7 @@ _no-target-specified:
 # Lists all targets defined in this makefile.
 .PHONY: list
 list:
-	@$(MAKE) -pRrn -f $(MAKEFILE_LIST) : 2>/dev/null | awk -v RS= -F: '/^# File/,/^# Finished Make data base/ {if ($$1 !~ "^[#.]") {print $$1}}' | egrep -v -e '^[^[:alnum:]]' -e '^$@$$' | sort
+	@$(MAKE) -pRrn -f $(lastword $(MAKEFILE_LIST)) : 2>/dev/null | awk -v RS= -F: '/^# File/,/^# Finished Make data base/ {if ($$1 !~ "^[#.]") {print $$1}}' | egrep -v -e '^[^[:alnum:]]' -e '^$@$$' | sort
 
 # Ensures that the git workspace is clean.
 .PHONY: _ensure-clean
@@ -36,7 +36,7 @@ _ensure-git-flow:
 .PHONY: version
 version: # _ensure-git-flow _ensure-clean update-readme
 ifndef NEW
-	@printf 'Current version:\n\tv%s (from package.json)\n\t%s (from git tag)\n' `json -f package.json version` `oldVer=$$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*'); echo "$${oldVer:-v0.0.0}"`
+	@printf 'Current version:\n\tv%s (from package.json)\n\t%s (from git tag)\n' `json -f package.json version` `oldVer=$$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' | head -n 1); echo "$${oldVer:-v0.0.0}"`
 	@printf 'Note:\tTo increment the version number, run:\n\t\tmake version NEW=<new-version>\n\twhere <new-version> is either an increment specifier (patch, minor, major,\n\tprepatch, preminor, premajor, prerelease), or an explicit <major>.<minor>.<patch> version number.\n'
 else
 	@oldVer=`git tag -l 'v[0-9]*.[0-9]*.[0-9]*'` || exit; oldVer=$${oldVer:-0.0.0}; oldVer=$${oldVer#v} \
@@ -48,7 +48,8 @@ else
 	   newVer=`semver -i "$$newVer" "$$oldVer"` || { echo 'Invalid version-increment specifier: $(NEW)' >&2; exit 2; } \
 	 fi; \
 	 printf "=== ABOUT TO BUMP VERSION:\n\t**$$oldVer** -> **$$newVer**\n===\nType 'proceed' to proceed, anything else to abort: " && read response && [ "$$response" = 'proceed' ] || { echo 'Aborted.' >&2; exit 2; };  \
-	 replace "v$$oldVer" "v$$newVer" .  -r --exclude='.git,node_modules,test,Makefile' || exit; \
+	 replace "v$${oldVer//./\\.}" "v$${newVer}" .  -r --exclude='.git,node_modules,test,Makefile' || exit; \
+	 fgrep -q "v$$newVer" || replace '^## Changelog$' '$$&\n\n* **'"$$newVer"'**\n\t* ???' CHANGEGLOG.md
    npm version $$newVer --no-git-tag-version >/dev/null || exit; \
 	 echo "Version bumped to [v]$$newVer in source files and package.json."
 endif	
@@ -56,7 +57,8 @@ endif
 
 .PHONY: update-readme
 update-readme:
-	@cliHelpStartLine='$$ awf help all'; \
-	 sed -n -e "/^\\$$cliHelpStartLine\$$/r "<(printf '%s\n\n' "$$cliHelpStartLine" && bin/awf help all && echo '```')$$'\n; //,/```/d; p' README.md > README.tmp.md && \
+	@CLI_HELP_CMD='bin/awf help all' && CLI_HELP_CMD_DISPLAY='awf help all'; \
+	 cliHelpStartLine='$$ '"$$CLI_HELP_CMD_DISPLAY"; \
+	 sed -n -e "/^\\$$cliHelpStartLine\$$/r "<(printf '%s\n\n' "$$cliHelpStartLine" && $$CLI_HELP_CMD && echo '```')$$'\n; //,/```/d; p' README.md > README.tmp.md && \
 	 sed -n -e $$'/^## Changelog/{r CHANGELOG.md\nq;}; p' README.tmp.md > README.md && rm README.tmp.md && \
 	 doctoc README.md >/dev/null && replace --silent '^\*\*Table of Contents\*\*\s+\*generated with \[DocToc\]\(http://doctoc.herokuapp.com/\)\*' '**Contents**' README.md
