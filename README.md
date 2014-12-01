@@ -23,9 +23,10 @@
 
         cp bin/awf /usr/local/bin/
 
+<!-- DO NOT EDIT: This chapter is updated by `make version/release` -->
 ## Usage
 
-```shell
+```
 $ awf help all
 
 SYNOPSIS
@@ -152,7 +153,13 @@ DESCRIPTION
   -r
     Regex matching; the search term is interpreted as an extended
     regular expressions; to match (one of) the field(s) in full, anchor with
-    '^...$'
+    '^...# Changelog
+
+* **v0.0.1** (2014-11-29):
+	* some rel
+
+old stuff
+
 
 EXAMPLES
     # List all installed workflows:
@@ -529,13 +536,10 @@ EXAMPLES
   awf info -h  # same as above
 ```
 
-<!-- DO NOT CHANGE THE NEXT LINE - `make` tasks rely on it to update README.md -->
+<!-- DO NOT EDIT: This chapter is updated by `make version/release` -->
 ## Changelog
 
-* **v0.0.2** (2014-11-07)
-    * some fix
+* **v0.0.1** (2014-11-29):
+	* some rel
 
-* **v0.0.1** (2014-11-06):
-    * Initial release.
-    * how??
-
+old stuff

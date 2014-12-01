@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
 THIS_NAME=$(basename "$BASH_SOURCE")
-# Note: the following line is automatically updated by `make version VERSION=<new-version>`
-THIS_VERSION=v0.1.0
+# Note: the following line is automatically updated by `make version ...`
+THIS_VERSION=v0.0.1
 
 # Helper function for exiting with error message due to runtime error.
 #   die [errMsg [exitCode]]
