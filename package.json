@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "os": "darwin",
   "description": "CLI for managing Alfred workflows (OS X only)",
-  "bin": "bin/awf",
+  "bin":  {
+    "awf": "bin/awf"
+  },
   "preferGlobal": true,
   "private": false,
   "repository": {
