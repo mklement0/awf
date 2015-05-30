@@ -23,7 +23,7 @@
 
         cp bin/awf /usr/local/bin/
 
-<!-- DO NOT EDIT: This chapter is updated by `make version/release` -->
+<!-- DO NOT EDIT: This chapter is updated by `make update-readme/release` -->
 ## Usage
 
 ```
@@ -155,10 +155,10 @@ DESCRIPTION
     regular expressions; to match (one of) the field(s) in full, anchor with
     '^...# Changelog
 
-* **v0.0.1** (2014-11-29):
-	* some rel
+* **v0.0.1** (2014-11-30):
+	* ??? aa
 
-old stuff
+old
 
 
 EXAMPLES
@@ -536,10 +536,8 @@ EXAMPLES
   awf info -h  # same as above
 ```
 
-<!-- DO NOT EDIT: This chapter is updated by `make version/release` -->
+<!-- DO NOT EDIT: This chapter is updated by `make update-readme/release` -->
 ## Changelog
 
-* **v0.0.1** (2014-11-29):
-	* some rel
-
-old stuff
+* **v0.0.1** (2014-11-30):
+	* ???

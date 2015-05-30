@@ -5,7 +5,7 @@ SHELL := bash
 	# Add the local npm packages' bin folder to the PATH, so that `make` can find them even when invoked directly (not via npm).
 	# !! Note that this extended path only takes effect in (a) recipe commands that are (b) true shell commands (not optimized away) - when in doubt, simply append ';'
 	# !! To also use the extended path in $(shell ...) function calls, use $(shell PATH="$(PATH)" ...),
-export PATH := ./node_modules/.bin:$(PATH)
+export PATH := $(PWD)/node_modules/.bin:$(PATH)
 	# Sanity-check to make sure dev dependencies (and npm) are installed.
 $(if $(shell [[ -d ./node_modules/semver ]] && echo 'ok'),,$(error Did you forget to run `npm install` after cloning the repo (Node.js must be installed)? At least one of the required dev dependencies not found))
 	# Determine the editor to use for modal editing. Use the same as for git, if configured; otherwise $EDITOR, then fall back to vi (which may be vim).
@@ -31,7 +31,7 @@ _ensure-clean-or-staged-changes-only:
 	@[[ -z $$(git status --porcelain | awk -F'\0' '$$2 != " " { print $$2 }') ]] || { echo "Workspace must either be clean or contain only staged changes; please commit or at least stage changes first." >&2; exit 2; }
 
 # If NEW is *not* specified: reports the current version number - both as defined by the latest git tag and by package.json
-# If NEW *is* specified: sets the version number in source files and package.json; incrementing from the latest git tag
+# If NEW *is* specified: sets the version number in source files and package.json and VERSION, if present; increments from the latest git [version] tag
 .PHONY: version
 version:
 ifndef NEW
@@ -47,12 +47,13 @@ else
 	 else \
 	   newVer=`semver -i "$$newVer" "$$oldVer"` || { echo 'Invalid version-increment specifier: $(NEW)' >&2; exit 2; } \
 	 fi; \
-	 printf "=== About to BUMP VERSION:\n\t$$oldVer -> **$$newVer**\n===\nYou'll also be prompted to provide a changelog entry.\nProceed (y/N)?: " && read response && [[ "$$response" =~ [yY] ]] || { echo 'Aborted.' >&2; exit 2; };  \
+	 printf "=== About to BUMP VERSION:\n\t$$oldVer -> **$$newVer**\n===\nProceed (y/N)?: " && read response && [[ "$$response" =~ [yY] ]] || { echo 'Aborted.' >&2; exit 2; };  \
 	 replace --silent --recursive --exclude='.git,node_modules,test,Makefile' "v$${oldVer//./\\.}" "v$${newVer}" . || exit; \
 	 [[ `json -f package.json version` == $$newVer ]] || npm version $$newVer --no-git-tag-version >/dev/null || exit; \
-	 fgrep -q "v$$newVer" CHANGELOG.md || replace --silent '^## Changelog$$' $$'$$&\n\n* **v'"$$newVer"$$'** ('"`date +'%Y-%m-%d'`"$$'):\n\t* ???' CHANGELOG.md; \
+	 [[ -f VERSION ]] && echo $$newVer >VERSION; \
+	 fgrep -q "v$$newVer" CHANGELOG.md || { { head -n 1 CHANGELOG.md && printf %s $$'\n* **v'"$$newVer"$$'** ('"`date +'%Y-%m-%d'`"$$'):\n\t* ???\n' && tail -n +2 CHANGELOG.md; } > CHANGELOG.tmp.md && mv CHANGELOG.tmp.md CHANGELOG.md; }; \
 	 git add --update . || exit; \
-	 echo "-- Version bumped to v$$newVer in source files and package.json."
+	 printf -- "-- Version bumped to v$$newVer in source files, package.json, and VERSION (if present).\n   Describe changes in CHANGELOG.md ('make release' will prompt for it).\n"
 endif	
 
 # Increments the version number, then commits and tags, pushes to origin, prompts to publish to the npm-registry.
@@ -67,7 +68,7 @@ ifdef NEW
 	 echo "-- v$$newVer committed."; \
 	 echo git tag -a -m "v$$newVer" "v$$newVer" || exit; \
 	 echo "-- v$$newVer tagged."; \
-	 echo git push origin master || exit; \
+	 echo git push origin --tags master || exit; \
 	 echo "-- v$$newVer pushed."; \
 	 if [[ `json -f package.json private` != 'true'  ]]; then \
 	 		printf "=== About to PUBLISH TO NPM as:\n\t**`json -f package.json name`@$$newVer**\n===\nType 'publish' to proceed; anything else to abort: " && read response && [[ "$$response" == 'publish' ]] || { echo 'Aborted.' >&2; exit 2; };  \
@@ -79,6 +80,11 @@ ifdef NEW
 	 echo "-- Done."
 endif
 
+# Updates README.md as follows:
+#  - Replaces the '## Usage' chapter with the command-line help output by this package's CLI, enclosed in a fenced codeblock and preceded by '$ <cmd>'.
+#    !! Be sure to adapt CLI_HELP_CMD and CLI_HELP_CMD_DISPLAY below accordingly.
+#  - Replaces the '## Changelog' chapter with the contents of CHANGELOG.md
+#  - Uses `doctoc` to insert a TOC at the top.
 .PHONY: update-readme
 update-readme:
 	@CLI_HELP_CMD=( bin/`json -f package.json name` help all ); \
@@ -88,4 +94,5 @@ update-readme:
 	 newText=$$(tail -n +3 CHANGELOG.md); \
 	 replace --count --quiet --multiline=false '(^|\n)(## Changelog\n\n)[\s\S]+?(\n(\s*<!-- .+? -->\s*\n)?#|$$)' $$'$$1$$2'"$$newText"$$'\n$$3' README.md | fgrep -q ' (1)' || { echo "Failed to update read-me chapter: changelog." >&2; exit 1; }; \
 	 doctoc README.md >/dev/null || { echo "Failed to update read-me TOC." >&2; exit 1; }; \
-	 replace --count --quiet '^\*\*Table of Contents\*\*.*$$' '**Contents**' README.md | { fgrep -q ' (1)' || { echo "Failed to update heading of read-me TOC." >&2; exit 1; } }
+	 replace --count --quiet '^\*\*Table of Contents\*\*.*$$' '**Contents**' README.md | { fgrep -q ' (1)' || { echo "Failed to update heading of read-me TOC." >&2; exit 1; } }; \
+	 echo "-- README.md updated."
