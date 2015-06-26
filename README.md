@@ -1,4 +1,11 @@
+![project status](https://img.shields.io/badge/status-not_ready_for_release-red.svg)
+
+<!-- [![npm version](https://img.shields.io/npm/v/awf.svg)](https://npmjs.com/package/awf) [![license](https://img.shields.io/npm/l/awf.svg)](https://github.com/mklement0/awf/blob/master/LICENSE.md)
+ -->
+
 # awf - a CLI for managing Alfred workflows
+
+[DO NOT USE YET.]
 
 `awf` (*A*lfred *W*ork*f*low) is a helper CLI for OS X users who frequently develop workflows for command-line launcher [Alfred](http://alfredapp.com).
 
