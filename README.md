@@ -555,6 +555,9 @@ This project gratefully depends on the following open-source components, accordi
 
 ## Changelog
 
+* **[v0.1.0-3](https://github.com/mklement0/awf/compare/v0.1.0-2...v0.1.0-3)** (2015-10-28):
+  * [fix] `awf export` should now work as advertised (support for output-folder argument, resolution of relative paths).
+
 * **[v0.1.0-2](https://github.com/mklement0/awf/compare/v0.1.0-1...v0.1.0-2)** (2015-10-28):
   * [fix] Using `.` as the target dev folder for `awf link` is now handled correctly.
 

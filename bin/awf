@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-THIS_NAME=$(basename "$BASH_SOURCE")
+kTHIS_NAME=${BASH_SOURCE##*/}
 # Note: the following line is automatically updated by `make version ...`
-THIS_VERSION=v0.1.0-2
+kTHIS_VERSION=v0.1.0-3
 
 # Helper function for exiting with error message due to runtime error.
 #   die [errMsg [exitCode]]
@@ -10,7 +10,7 @@ THIS_VERSION=v0.1.0-2
 # Prefix for context is always prepended.
 # Note: An error message is *always* printed; if you just want to exit with a specific code silently, use `exit n` directly.
 die() {
-  echo "$THIS_NAME: ERROR: ${1:-"ABORTING due to unexpected error."}" 1>&2
+  echo "$kTHIS_NAME: ERROR: ${1:-"ABORTING due to unexpected error."}" 1>&2
   exit ${2:-1} # Note: If the argument is non-numeric, the shell prints a warning and uses exit code 255.
 }
 
@@ -18,7 +18,7 @@ die() {
 #   dieSyntax [errMsg]
 # Default error message is provided, as is prefix and suffix; exit code is always 2.
 dieSyntax() {
-    echo "$THIS_NAME: ARGUMENT ERROR: ${1:-"Invalid argument(s) specified."} Use \`$THIS_NAME help [command]\` for help." 1>&2
+    echo "$kTHIS_NAME: ARGUMENT ERROR: ${1:-"Invalid argument(s) specified."} Use \`$kTHIS_NAME help [command]\` for help." 1>&2
     exit 2
 }
 
@@ -65,46 +65,46 @@ cliHelp() {
   # !!   - exactly 1 line per subcommand
   # !!   - a matching details heredoc defined below.
   IFS= read -d '' -r synopses <<EOF
-  $THIS_NAME list|ls [-b] [-o fieldIdChars] [[-s fieldIdChars] [-x|-r] searchTerm]
+  $kTHIS_NAME list|ls [-b] [-o fieldIdChars] [[-s fieldIdChars] [-x|-r] searchTerm]
     Lists installed workflows, optionally with custom output and filtering.
-  $THIS_NAME search          [searchTerm]
+  $kTHIS_NAME search          [searchTerm]
     Searches for workflows in the Alfred Preferences application.
 
-  $THIS_NAME info [-b] [-o fieldIdChars] [wfFolderOrBundleID]
+  $kTHIS_NAME info [-b] [-o fieldIdChars] [wfFolderOrBundleID]
     Prints a workflow's metadata, optionally with selectable output fields.
-  $THIS_NAME id              [wfFolder]
+  $kTHIS_NAME id              [wfFolder]
     Prints the bundle ID of a workflow.
-  $THIS_NAME which [-l|-P] [-R]          [wfDevFolderOrBundleID]
+  $kTHIS_NAME which [-l|-P] [-R]          [wfDevFolderOrBundleID]
     Prints the full path to an installed workflow's folder.    
-  $THIS_NAME reveal [-P]     [wfDevFolderOrBundleID | '/']
+  $kTHIS_NAME reveal [-P]     [wfDevFolderOrBundleID | '/']
     Reveals an installed workflow's folder in Finder.
     '/' reveals the root of Alfred 2's workflow folders.
 
-  $THIS_NAME cd [-P]         [wfFolderOrBundleID | '/']
+  $kTHIS_NAME cd [-P]         [wfFolderOrBundleID | '/']
     Changes to an installed workflow's folder in a new Terminal window.
     '/' changes to the root of Alfred 2's workflow folders.
-  $THIS_NAME edit            [wfFolderOrBundleID]
+  $kTHIS_NAME edit            [wfFolderOrBundleID]
     Opens a workflow for editing in the Alfred Preferences application.
 
-  $THIS_NAME install         [wfDevFolder]
+  $kTHIS_NAME install         [wfDevFolder]
     Installs a workflow from a dev folder.
-  $THIS_NAME export  [-R]    [wfFolder [outFolder]]
+  $kTHIS_NAME export  [-R]    [wfFolder [outFolder]]
     Exports a workflow to an *.alfredworkflow ZIP archive.
 
-  $THIS_NAME link|ln [-f]    [wfDevFolder [symlinkName]]
+  $kTHIS_NAME link|ln [-f]    [wfDevFolder [symlinkName]]
     Symlinks a dev workflow into the folder of installed workflows.
-  $THIS_NAME unlink|unln     [wfFolderOrBundleID]
+  $kTHIS_NAME unlink|unln     [wfFolderOrBundleID]
     Removes a symlink to a dev workflow from the folder of installed ones.
-  $THIS_NAME prune
+  $kTHIS_NAME prune
     Removes dead symlinks from the folder of installed workflows.
-  $THIS_NAME todev [-R]      [wfInstalledFolderOrBundleID [wfDevFolder]]
+  $kTHIS_NAME todev [-R]      [wfInstalledFolderOrBundleID [wfDevFolder]]
     Converts an installed workflow to a dev workflow.
-  $THIS_NAME fromdev [-k]    [wfDevFolder]
+  $kTHIS_NAME fromdev [-k]    [wfDevFolder]
     Converts a dev workflow to a regular installed workflow.
-  $THIS_NAME version [-f] [wfFolderOrBundleId [newVersion|'major|'minor'|'patch']]
+  $kTHIS_NAME version [-f] [wfFolderOrBundleId [newVersion|'major|'minor'|'patch']]
     Prints or assigns a workflow's version number.
 
-  $THIS_NAME help [command | 'all']  # or: $THIS_NAME command -h
+  $kTHIS_NAME help [command | 'all']  # or: $kTHIS_NAME command -h
     Prints help information.
 EOF
 
@@ -117,8 +117,8 @@ DESCRIPTION
   Performs various operations related to Alfred 2 workflows.
   (To learn about Alfred, go to http://alfredapp.com)
 
-  To get help for a specific command, use \`$THIS_NAME help <command>\`
-  or \`$THIS_NAME <command> -h\`.
+  To get help for a specific command, use \`$kTHIS_NAME help <command>\`
+  or \`$kTHIS_NAME <command> -h\`.
   
   WFDEVFOLDER is a folder path containing an Alfred workflow
    *dev* (development) project, in a *separate location* from and
@@ -144,7 +144,7 @@ EOF
 
     if (( all )); then
       # Extract all command names - in the order in which they appear in the synopsis.
-      cmds=$(awk -F '[[:blank:]]+|[|]' '/^[[:blank:]]+'"$THIS_NAME"'/ {print $3}' <<<"$synopses")
+      cmds=$(awk -F '[[:blank:]]+|[|]' '/^[[:blank:]]+'"$kTHIS_NAME"'/ {print $3}' <<<"$synopses")
     else
       cmds=$cmd
     fi
@@ -154,7 +154,7 @@ EOF
 
       (( all )) && echo $'\n---'  # !! Do not choose a separator that happens to be a heading in Markdown.
 
-      egrep -i -A 1 "\s+$THIS_NAME .*\<$cmd\>" <<<"$synopses" || die "Command not found: $cmd"
+      egrep -i -A 1 "\s+$kTHIS_NAME .*\<$cmd\>" <<<"$synopses" || die "Command not found: $cmd"
 
       echo $'\nDESCRIPTION'
 
@@ -290,10 +290,10 @@ EOF
 
 EXAMPLES
     # Print version of the workflow in the current folder:
-  $THIS_NAME version
+  $kTHIS_NAME version
     # Increment the patch component of the version number of the workflow
     # in the current folder (e.g., 0.5.1 -> 0.5.2)
-  $THIS_NAME version . patch
+  $kTHIS_NAME version . patch
 
 EOF
           ;;
@@ -321,10 +321,10 @@ EOF
 EXAMPLES
     # Print the installed location (only) of the dev workflow stored
     # in the current folder:
-  $THIS_NAME which -b
+  $kTHIS_NAME which -b
     # Print the installed location and, if applicable, the underlying
     # dev location of the workflow with the specified bundle ID:
-  $THIS_NAME which net.same2u.alfw.StringLength
+  $kTHIS_NAME which net.same2u.alfw.StringLength
 EOF
           ;;
         'id')
@@ -334,7 +334,7 @@ EOF
 
 EXAMPLES
     # Print the bundle ID of the workflow in the specified folder:
-  $THIS_NAME id ~/Projects/Alfred/StringLength
+  $kTHIS_NAME id ~/Projects/Alfred/StringLength
 EOF
           ;;
         'info')
@@ -361,10 +361,10 @@ $(printFieldsHelp '    ')
 
 EXAMPLES
     # Print metadata for workflow in current folder:
-  $THIS_NAME info  
+  $kTHIS_NAME info  
     # Print name and bundleID fields without field names for
     # workflow with bundle ID 'net.same2u.alfw.StringLength':
-  $THIS_NAME info -b -o ni net.same2u.alfw.StringLength
+  $kTHIS_NAME info -b -o ni net.same2u.alfw.StringLength
 EOF
           ;;
         'list'|'ls')
@@ -416,15 +416,15 @@ $(printFieldsHelp '    ')
 
 EXAMPLES
     # List all installed workflows:
-  $THIS_NAME ls
+  $kTHIS_NAME ls
     # List all installed workflows whose name contains 'chrome'
     # by name and description:
-  $THIS_NAME ls -o nd chrome
+  $kTHIS_NAME ls -o nd chrome
       # List all disabled workflows by name:
-  $THIS_NAME ls -o n -s a true
+  $kTHIS_NAME ls -o n -s a true
     # List name and bundle ID of workflows whose bundle ID starts with
     # 'net.same2u.':
-  $THIS_NAME ls -o ni -s i -r '^net\.same2u\.'
+  $kTHIS_NAME ls -o ni -s i -r '^net\.same2u\.'
 EOF
           ;;
         'cd')
@@ -445,7 +445,7 @@ EOF
 EXAMPLES
     # Open a new Terminal window and change to the folder of the
     # (installed) workflow with the specified bundle ID:
-  $THIS_NAME cd net.same2u.alfw.StringLength
+  $kTHIS_NAME cd net.same2u.alfw.StringLength
 EOF
           ;;
         'reveal')
@@ -457,13 +457,13 @@ EOF
   As a special case, you may specify '/' to reveal the *root* folder of
   all installed workflows.
 
-  This is effectively a shortcut to \`$THIS_NAME which -R\`, except that the folder path
+  This is effectively a shortcut to \`$kTHIS_NAME which -R\`, except that the folder path
   is not also printed to stdout.  
 
 EXAMPLES
     # Reveal the location of the workflow with the specified bundle ID
     # in Finder:
-  $THIS_NAME reveal net.same2u.alfw.StringLength
+  $kTHIS_NAME reveal net.same2u.alfw.StringLength
 EOF
           ;;
         'edit')
@@ -515,10 +515,10 @@ EOF
 
 EXAMPLES
     # Search for workflows containing 'vm'
-  $THIS_NAME search vm
+  $kTHIS_NAME search vm
     # Search for workflows whose hotkey representations contain
     # the key combination Command-C
-  $THIS_NAME search ⌘c
+  $kTHIS_NAME search ⌘c
 EOF
           ;;
         'help')
@@ -534,12 +534,12 @@ EOF
 
 EXAMPLES
     # Print help overview only:
-  $THIS_NAME help
+  $kTHIS_NAME help
     # Print help overview, followed by detailed help for all commands:
-  $THIS_NAME help all
+  $kTHIS_NAME help all
     # Print detailed help for the 'info' command.
-  $THIS_NAME help info
-  $THIS_NAME info -h  # same as above
+  $kTHIS_NAME help info
+  $kTHIS_NAME info -h  # same as above
 EOF
           ;;
         esac
@@ -813,11 +813,13 @@ getAndVerifyWfFolder() {
 
 }
 
-
+# makeWfArchive <targetArchiveFilePath> <sourceFolderPath>
 makeWfArchive() {
   local archivePath=$1 sourcePath=$2
-      # Create the ZIP archive.
-      # !! By cd-ing to the source folder first we ensure that only paths *relative* to the source folders are recorded in the archive.
+  # Since we'll be changing to the source directory below, we must resolve
+  # the target path to a full path beforehand, in case it is a relative path.
+  [[ $archivePath =~ ^/ ]] || archivePath="$PWD/$archivePath"
+  # Create the ZIP archive.
   (cd "$sourcePath" && zip -r "$archivePath" . -x "${EXCLUSION_PATTERNS[@]}" >/dev/null) || die
 }
 
@@ -859,25 +861,49 @@ getInstalledWfFolderByBundleId() {
   return 1
 }
 
-# makeSymlinkPath <devFolderPath>
-# When using `awf todev` or `awf link`, construct the full symlink path based on 
-# a suitable name for the symlink to be created among the installed workflows, 
-# prefixed with ${DEV_WF_NAMEPREFIX}.
+# SYNOPSIS
+#   getProjectName <devFolderPath>
+# DESCRIPTION
+#   Derives the project name from the specified dev folder path.
 #
-# If the *parent* folder of <devFolderPath> is an (npm-style) package project, assume the workflow is part of a published
-# package and use the *parent* folder's name instead, which is assumed to be project-specific.
-# (By contrast, the source folder *inside* a package will typically have a *generic* name, such as 'workflow'.)
-# Otherwise, use <devFolderPath>'s own folder name.
+#   If the *parent* folder of <devFolderPath> is an (npm-style) package project, assume the workflow is part of a published
+#   package and use the *parent* folder's name, which is assumed to be project-specific.
+#   (By contrast, the source folder *inside* a package will typically have a *generic* name, such as 'alfredworkflow'.)
+#   Otherwise, use <devFolderPath>'s own folder name.
+getProjectName() {
+  local wfDevFolder=$1 projectName
+  # Make sure that '.' is expanded to a full path, so we can apply `dirname` and `basename` below.
+  [[ $wfDevFolder == '.' ]] && wfDevFolder="$PWD"
+  # Determine the core of the symlink name (will be suffixed with ${DEV_WF_NAMEPREFIX}):
+  if [[ -f "$wfDevFolder"/../package.json ]]; then # parent folder is (npm-style) package
+    # Use *parent* folder name.
+    projectName=$(basename -- "$(dirname -- "$wfDevFolder")")
+  else
+    # Use the current folder name.
+    projectName=$(basename -- "$wfDevFolder")
+  fi
+  printf '%s\n' "$projectName"
+}
+
+
+# SYNOPSIS
+#   makeSymlinkPath <devFolderPath>
+# DESCRIPTION
+#   When using `awf todev` or `awf link`, construct the full symlink path based on 
+#   a suitable name for the symlink to be created among the installed workflows, 
+#   prefixed with ${DEV_WF_NAMEPREFIX}.
+#
+#   If the *parent* folder of <devFolderPath> is an (npm-style) package project, assume the workflow is part of a published
+#   package and use the *parent* folder's name instead, which is assumed to be project-specific.
+#   (By contrast, the source folder *inside* a package will typically have a *generic* name, such as 'alfredworkflow'.)
+#   Otherwise, use <devFolderPath>'s own folder name.
 makeSymlinkPath() {
   local wfDevFolder=$1 symlinkCoreName symlinkPath
   # Make sure that '.' is expanded to a full path, so we can apply `dirname` and `basename` below.
   [[ $wfDevFolder == '.' ]] && wfDevFolder="$PWD"
-  # Determine the full path of the symlink to create among the installed workflows...
   # Determine the core of the symlink name (will be suffixed with ${DEV_WF_NAMEPREFIX}):
-  if [[ -f "$wfDevFolder"/../package.json ]]; then
-    # If the *parent* folder is an (npm-style) package project, assume the workflow is part of a published
-    # package and use the *parent* folder's name instead, which is assumed to be descriptive.
-    # (By contrast, the source folder *inside* a package will typically have a *generic* name, such as 'workflow'.)
+  if [[ -f "$wfDevFolder"/../package.json ]]; then # parent folder is (npm-style) package
+    # Use *parent* folder name.
     symlinkCoreName=$(basename -- "$(dirname -- "$wfDevFolder")")
   else
     # Use the current folder name.
@@ -899,47 +925,83 @@ warnIfBundleIdMissing() {
   return 0
 }
 
+## -------
 # SYNOPSIS
-#   rreadlinkchain symLink
+#   rreadlinkchain <symLink>
 # DESCRIPTION
 #  Recursive readlink: prints the CHAIN OF SYMLINKS from the input
 #  file to its ultimate target, with each path on a separate line.
 #  Only the ultimate target's path is canonical, though.
-# EXAMPLE
+#  A broken symlink in the chain causes an error that reports the
+#  non-existent target.
+#  An input path that is not a symlink will print its own canonical path.
+#  
+# NOTES
+#   Attempts to use `readlink`, which is found on most modern platforms
+#   (notable exception: HP-UX). If `readlink` is not available, output from
+#   `ls -l` is parsed, which is the only POSIX-compliant way to determine a 
+#   symlink's target.
+#    Caveat: This will break if a filename contains literal ' -> ' or has 
+#            embedded newlines.
+# EXAMPLES
 #     # Print the symlink chain of the `git` executable in the $PATH.
 #   rreadlinkchain  "$(which git)"
 #    # Ditto, using single-line `ls -l`-style format ('a@ -> b')
 #   rreadlinkchain  "$(which git)" | sed -nE -e '$!{a\'$'\n''@ -> ' -e '}; p' | tr -d '\n'
 # THANKS
 #   http://stackoverflow.com/a/1116890/45375
-rreadlinkchain() ( # execute in *subshell* to localize the effect of `cd`
+rreadlinkchain() ( # execute in *subshell* to localize the effect of `cd`, ...
 
-  local target=$1 targetDir targetName
+  local target=$1 targetDir targetName readlinkexe=$(command -v readlink) CDPATH= 
   
+  # Since we'll be using `command` below for a predictable execution
+  # environment, we make sure that it has its original meaning.
+  { \unalias command; \unset -f command; } &>/dev/null
+
   while :; do
-      # Unless the file is a symlink OR exists, we report an error - note that using `-e` with a symlink reports the *target*'s existence, not the symlink's.
-    [[ -L $target || -e $target ]] || { printf '%s\n' "ERROR: $FUNCNAME: '$target' does not exist." 1>&2; return 1; }
+      # Unless the file is a symlink OR exists, we report an error - note that 
+      # using `-e` with a symlink reports the *target*'s existence, not the
+      # symlink's.
+    [[ -L $target || -e $target ]] || { command printf '%s\n' "ERROR: $FUNCNAME: '$target' does not exist." 1>&2; return 1; }
       # !! We use `cd` to change to the target's folder
       # !! so we can correctly resolve the full dir. path.
-    builtin cd "$(command -p dirname "$target")" # note: cd "" is the same as cd . - i.e., a no-op.
+    command cd "$(command dirname -- "$target")" # note: cd "" is the same as cd . - i.e., a no-op.
     targetDir=$PWD
-    targetName=$(command -p basename "$target")
+    targetName=$(command basename -- "$target")
+    [[ $targetName == '/' ]] && targetName='' # !! curiously, `basename /` returns '/'
     done=0
     if [[ ! -L $targetName ]]; then
-        # We've found the ultimate target (or the input file wasn't a symlink to begin with).
-        # For the *ultimate* target we want use `pwd -P` to make sure we use the actual, physical directory,
-        # (not a symlink) to get the *canonical* path.
-      targetDir=$(builtin pwd -P)
+        # We've found the ultimate target (or the input file wasn't a symlink to
+        # begin with). For the *ultimate* target we want use `pwd -P` to make
+        # sure we use the actual, physical directory (not a symlink) to get the
+        # *canonical* path.
+      targetDir=$(command pwd -P)
       done=1
     fi
-      # Print (next) path.
-    printf '%s\n' "${targetDir%/}/$targetName"
+      # Print (next) path - note that we manually resolve paths ending in /. 
+      # and /.. to make sure we have a normalized path.
+    if [[ $targetName == '.' ]]; then
+      command printf '%s\n' "${targetDir%/}"
+    elif  [[ $targetName == '..' ]]; then
+      # Caveat: something like /var/.. will resolve to /private (assuming
+      # /var@ -> /private/var), i.e. the '..' is applied AFTER canonicalization.
+      command printf '%s\n' "$(command dirname -- "${targetDir}")"
+    else
+      command printf '%s\n' "${targetDir%/}/$targetName"
+    fi
       # Exit, if we've hit the non-symlink at the end of the chain.
     (( done )) && break 
       # File is symlink -> continue to resolve.
-    target=$(command -p readlink -- "$targetName")
+    if [[ -n $readlinkexe ]]; then # Use `readlink`.
+      target=$("$readlinkexe" -- "$targetName")
+    else # `readlink` utility not available.
+      # Parse `ls -l` output, which, unfortunately, is the only POSIX-compliant 
+      # way to determine a symlink's target. Hypothetically, this can break with
+      # filenames containig literal ' -> ' and embedded newlines.
+      target=$(command ls -l -- "$targetName")
+      target=${target#* -> }
+    fi
   done
-
 )
 
 stringEqualsNoCase() ( # !! Note the use of ( ... ) to execute the whole function body in a subshell.
@@ -1201,7 +1263,7 @@ installWf() {
   warnIfBundleIdMissing "$wfDevFolder"
 
   # Determine the path of the archive file to be created, using a *temporary* file.
-  archiveFile=$(mktemp -u -t "$(basename "$wfDevFolder")").alfredworkflow
+  archiveFile=$(mktemp -u -t "$(getProjectName "$wfDevFolder")").alfredworkflow
 
   # Create the archive file.
   makeWfArchive "$archiveFile" "$wfDevFolder" || die
@@ -1217,6 +1279,7 @@ installWf() {
 exportWf() {
 
   local wfFolder exportFolder wfProjectName archiveFile
+
 
   # Option-parameters loop.
   local reveal=0
@@ -1239,10 +1302,11 @@ exportWf() {
     shift
   done
 
-    # Parse arguments.
+    # Parse operands.
   case $# in
-    0|1)
+    0|1|2)
       wfFolder=${1:-.}
+      exportFolder=${2:-"$wfFolder"}
       ;;
     *)
       dieSyntax "Unexpected number of arguments specified."
@@ -1254,14 +1318,10 @@ exportWf() {
 
   warnIfBundleIdMissing "$wfFolder"
 
-  exportFolder=${1:-$wfFolder}; shift
   [[ -d $exportFolder ]] || die "Specified export folder not found: $exportFolder"
 
-  # Make sure that not too many parameters were specified.
-  (( $# == 0 )) || dieSyntax "Unexpected argument(s) specified."
-
-  # Determine the folder and filename of the archive file to be created.
-  wfProjectName=$(basename "$PWD")
+  # Determine the project name, which will serve as the root of the archive file to be created.
+  wfProjectName=$(getProjectName "$wfFolder")
 
   # Create archive in specified export folder, or same folder as project by default.
   archiveFile="$exportFolder/$wfProjectName.alfredworkflow"
@@ -1270,7 +1330,7 @@ exportWf() {
   [[ -f $archiveFile ]] && { rm "$archiveFile" || die; }
 
   # Create the archive file.
-  makeWfArchive "$archiveFile" "$wfDevFolder" || die
+  makeWfArchive "$archiveFile" "$wfFolder" || die
     
   echo "Workflow archive successfully created: ${archiveFile/#$PWD/.}"
 
@@ -2351,7 +2411,7 @@ case $(tr '[:upper:]' '[:lower:]' <<<"$cmd") in
     wfVersion "$@"
     ;;
   -v|--version)
-    echo "$THIS_NAME ${THIS_VERSION#v}"
+    echo "$kTHIS_NAME ${kTHIS_VERSION#v}"
     ;;
   *)
     dieSyntax "Unrecognized command: '$cmd'."
