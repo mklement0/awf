@@ -1,13 +1,12 @@
-![project status](https://img.shields.io/badge/status-not_ready_for_release-red.svg)
+![project status - not ready for release](https://img.shields.io/badge/status-not_ready_for_release-red.svg)
 
-<!-- [![npm version](https://img.shields.io/npm/v/awf.svg)](https://npmjs.com/package/awf) [![license](https://img.shields.io/npm/l/awf.svg)](https://github.com/mklement0/awf/blob/master/LICENSE.md)
- -->
+[![license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/mklement0/awf/blob/master/LICENSE.md)
 
 # awf - a CLI for managing Alfred workflows
 
 [DO NOT USE YET.]
 
-`awf` (*A*lfred *W*ork*f*low) is a helper CLI for OS X users who frequently develop workflows for command-line launcher [Alfred](http://alfredapp.com).
+`awf` (*A*lfred *W*ork*f*low) is a helper CLI for OS X users who frequently develop workflows for command-line launcher [Alfred 2](http://alfredapp.com).
 
 ## Installation
 
@@ -22,7 +21,7 @@
 
 <!-- DO NOT EDIT THE FENCED CODE BLOCK and RETAIN THIS COMMENT: The fenced code block below is updated by `make update-readme/release` with CLI usage information. -->
 
-```
+```nohighlight
 $ awf help all
 
 SYNOPSIS
@@ -37,11 +36,13 @@ SYNOPSIS
     Prints the bundle ID of a workflow.
   awf which [-l|-P] [-R]          [wfDevFolderOrBundleID]
     Prints the full path to an installed workflow's folder.    
-  awf reveal [-P]     [wfDevFolderOrBundleID]
+  awf reveal [-P]     [wfDevFolderOrBundleID | '/']
     Reveals an installed workflow's folder in Finder.
+    '/' reveals the root of Alfred 2's workflow folders.
 
-  awf cd [-P]         [wfFolderOrBundleID]
+  awf cd [-P]         [wfFolderOrBundleID | '/']
     Changes to an installed workflow's folder in a new Terminal window.
+    '/' changes to the root of Alfred 2's workflow folders.
   awf edit            [wfFolderOrBundleID]
     Opens a workflow for editing in the Alfred Preferences application.
 
@@ -50,7 +51,7 @@ SYNOPSIS
   awf export  [-R]    [wfFolder [outFolder]]
     Exports a workflow to an *.alfredworkflow ZIP archive.
 
-  awf link|ln [-f]    [wfDevFolder]
+  awf link|ln [-f]    [wfDevFolder [symlinkName]]
     Symlinks a dev workflow into the folder of installed workflows.
   awf unlink|unln     [wfFolderOrBundleID]
     Removes a symlink to a dev workflow from the folder of installed ones.
@@ -90,7 +91,7 @@ DESCRIPTION
   *installed* workflows are searched for said bundle ID.
 
 
-~~~
+---
   awf list|ls [-b] [-o fieldIdChars] [[-s fieldIdChars] [-x|-r] searchTerm]
     Lists installed workflows, optionally with custom output and filtering.
 
@@ -163,7 +164,7 @@ EXAMPLES
     # 'net.same2u.':
   awf ls -o ni -s i -r '^net\.same2u\.'
 
-~~~
+---
   awf search          [searchTerm]
     Searches for workflows in the Alfred Preferences application.
 
@@ -197,7 +198,7 @@ EXAMPLES
     # the key combination Command-C
   awf search ⌘c
 
-~~~
+---
   awf info [-b] [-o fieldIdChars] [wfFolderOrBundleID]
     Prints a workflow's metadata, optionally with selectable output fields.
 
@@ -240,7 +241,7 @@ EXAMPLES
     # workflow with bundle ID 'net.same2u.alfw.StringLength':
   awf info -b -o ni net.same2u.alfw.StringLength
 
-~~~
+---
   awf id              [wfFolder]
     Prints the bundle ID of a workflow.
 
@@ -252,7 +253,7 @@ EXAMPLES
     # Print the bundle ID of the workflow in the specified folder:
   awf id ~/Projects/Alfred/StringLength
 
-~~~
+---
   awf which [-l|-P] [-R]          [wfDevFolderOrBundleID]
     Prints the full path to an installed workflow's folder.    
 
@@ -284,8 +285,8 @@ EXAMPLES
     # dev location of the workflow with the specified bundle ID:
   awf which net.same2u.alfw.StringLength
 
-~~~
-  awf reveal [-P]     [wfDevFolderOrBundleID]
+---
+  awf reveal [-P]     [wfDevFolderOrBundleID | '/']
     Reveals an installed workflow's folder in Finder.
 
 DESCRIPTION
@@ -304,8 +305,8 @@ EXAMPLES
     # in Finder:
   awf reveal net.same2u.alfw.StringLength
 
-~~~
-  awf cd [-P]         [wfFolderOrBundleID]
+---
+  awf cd [-P]         [wfFolderOrBundleID | '/']
     Changes to an installed workflow's folder in a new Terminal window.
 
 DESCRIPTION
@@ -327,7 +328,7 @@ EXAMPLES
     # (installed) workflow with the specified bundle ID:
   awf cd net.same2u.alfw.StringLength
 
-~~~
+---
   awf edit            [wfFolderOrBundleID]
     Opens a workflow for editing in the Alfred Preferences application.
 
@@ -352,7 +353,7 @@ DESCRIPTION
   will be among them, it may not be the one that is the current selection
   in the UI.
 
-~~~
+---
   awf install         [wfDevFolder]
     Installs a workflow from a dev folder.
 
@@ -370,7 +371,7 @@ DESCRIPTION
   the resulting archive:
     .* *.alfredworkflow
 
-~~~
+---
   awf export  [-R]    [wfFolder [outFolder]]
     Exports a workflow to an *.alfredworkflow ZIP archive.
 
@@ -384,8 +385,8 @@ DESCRIPTION
   -R
     reveals the resulting archive in Finder.
 
-~~~
-  awf link|ln [-f]    [wfDevFolder]
+---
+  awf link|ln [-f]    [wfDevFolder [symlinkName]]
     Symlinks a dev workflow into the folder of installed workflows.
 
 DESCRIPTION
@@ -395,6 +396,8 @@ DESCRIPTION
   mustn't be an installed workflow with the same bundle ID. However, if
   that installed workflow's folder is the very same symlink about to be
   created, no error is reported and no action is performed.
+  The symlink's name will be 'dev.workflow.<symlinkName>'.
+  <symlinkName> defaults to the name of the dev workflow folder.
 
   -f 
     Force creation of the symlink: If an installed workflow has the
@@ -403,7 +406,7 @@ DESCRIPTION
     Useful after moving the dev folder to a different location or changing
     its name.
 
-~~~
+---
   awf unlink|unln     [wfFolderOrBundleID]
     Removes a symlink to a dev workflow from the folder of installed ones.
 
@@ -413,7 +416,7 @@ DESCRIPTION
   The dev workflow may be specified directly as a dev workflow folder,
   indirectly as an installed workflow symlink, or even as a bundle ID.
 
-~~~
+---
   awf prune
     Removes dead symlinks from the folder of installed workflows.
 
@@ -421,7 +424,7 @@ DESCRIPTION
   Removes dead symlinks to dev workflow folders, if any, from among 
   the installed workflow folders.
 
-~~~
+---
   awf todev [-R]      [wfInstalledFolderOrBundleID [wfDevFolder]]
     Converts an installed workflow to a dev workflow.
 
@@ -440,7 +443,7 @@ DESCRIPTION
   -R
     Reveals the newly created symlink in Finder.
 
-~~~
+---
   awf fromdev [-k]    [wfDevFolder]
     Converts a dev workflow to a regular installed workflow.
 
@@ -459,7 +462,7 @@ DESCRIPTION
     Note that this will render the dev workflow folder a detached,
     independent copy of the newly installed workflow.
 
-~~~
+---
   awf version [-f] [wfFolderOrBundleId [newVersion|'major|'minor'|'patch']]
     Prints or assigns a workflow's version number.
 
@@ -502,7 +505,7 @@ EXAMPLES
   awf version . patch
 
 
-~~~
+---
   awf help [command | 'all']  # or: awf command -h
     Prints help information.
 
@@ -540,7 +543,7 @@ This project gratefully depends on the following open-source components, accordi
 
 <!-- DO NOT EDIT THE NEXT CHAPTER and RETAIN THIS COMMENT: The next chapter is updated by `make update-readme/release` with the dependencies from 'package.json'. ALSO, LEAVE AT LEAST 1 BLANK LINE AFTER THIS COMMENT. -->
 
-### npm Dependencies
+### npm dependencies
 
 * [doctoc (D)](https://github.com/thlorenz/doctoc)
 * [json (D)](https://github.com/trentm/json)
@@ -552,5 +555,5 @@ This project gratefully depends on the following open-source components, accordi
 
 ## Changelog
 
-* **v0.1.0** (2014-12-09):
-	* ???
+* **v0.1.0-0** (2015-10-28):
+  * [doc] CLI help improved.

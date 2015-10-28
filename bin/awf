@@ -2,7 +2,7 @@
 
 THIS_NAME=$(basename "$BASH_SOURCE")
 # Note: the following line is automatically updated by `make version ...`
-THIS_VERSION=v0.1.0
+THIS_VERSION=v0.1.0-0
 
 # Helper function for exiting with error message due to runtime error.
 #   die [errMsg [exitCode]]
@@ -76,11 +76,13 @@ cliHelp() {
     Prints the bundle ID of a workflow.
   $THIS_NAME which [-l|-P] [-R]          [wfDevFolderOrBundleID]
     Prints the full path to an installed workflow's folder.    
-  $THIS_NAME reveal [-P]     [wfDevFolderOrBundleID]
+  $THIS_NAME reveal [-P]     [wfDevFolderOrBundleID | '/']
     Reveals an installed workflow's folder in Finder.
+    '/' reveals the root of Alfred 2's workflow folders.
 
-  $THIS_NAME cd [-P]         [wfFolderOrBundleID]
+  $THIS_NAME cd [-P]         [wfFolderOrBundleID | '/']
     Changes to an installed workflow's folder in a new Terminal window.
+    '/' changes to the root of Alfred 2's workflow folders.
   $THIS_NAME edit            [wfFolderOrBundleID]
     Opens a workflow for editing in the Alfred Preferences application.
 
@@ -89,7 +91,7 @@ cliHelp() {
   $THIS_NAME export  [-R]    [wfFolder [outFolder]]
     Exports a workflow to an *.alfredworkflow ZIP archive.
 
-  $THIS_NAME link|ln [-f]    [wfDevFolder]
+  $THIS_NAME link|ln [-f]    [wfDevFolder [symlinkName]]
     Symlinks a dev workflow into the folder of installed workflows.
   $THIS_NAME unlink|unln     [wfFolderOrBundleID]
     Removes a symlink to a dev workflow from the folder of installed ones.
@@ -150,7 +152,7 @@ EOF
     # !! Every subcommand from the synopses above is expected to have a case branch with detailed information.
     for cmd in $cmds; do
 
-      (( all )) && echo $'\n~~~'  # !! Do not choose a separator that happens to be a heading in Markdown.
+      (( all )) && echo $'\n---'  # !! Do not choose a separator that happens to be a heading in Markdown.
 
       egrep -i -A 1 "\s+$THIS_NAME .*\<$cmd\>" <<<"$synopses" || die "Command not found: $cmd"
 
@@ -195,6 +197,8 @@ EOF
   mustn't be an installed workflow with the same bundle ID. However, if
   that installed workflow's folder is the very same symlink about to be
   created, no error is reported and no action is performed.
+  The symlink's name will be '$DEV_WF_NAMEPREFIX<symlinkName>'.
+  <symlinkName> defaults to the name of the dev workflow folder.
 
   -f 
     Force creation of the symlink: If an installed workflow has the
@@ -1638,10 +1642,10 @@ pruneDeadSymlinks() {
 
 
 # SYNOPSIS
-#   linkDevToInstalled [-f] wfDevFolder
+#   linkDevToInstalled [-f] [wfDevFolder [symlinkName]]
 linkDevToInstalled() {
 
-  local wfDevFolder wfRootFolder plistFile bundleId symlinkPath existingSymlinkPath existingWfFolder
+  local wfDevFolder wfRootFolder symlinkFilename plistFile bundleId symlinkPath existingSymlinkPath existingWfFolder
 
   # Option-parameters loop.
   local force=0
@@ -1666,8 +1670,9 @@ linkDevToInstalled() {
 
   # Parse arguments.
   case $# in
-    0|1)
-      wfDevFolder=${1:-.}
+    0|1|2)
+      wfDevFolder=${1:-$PWD}
+      symlinkName=${2:-$(basename -- "$wfDevFolder")}
       ;;
     *)
       dieSyntax "Unexpected number of arguments specified."
@@ -1687,7 +1692,7 @@ linkDevToInstalled() {
   [[ -d $wfRootFolder ]] || die "Root folder of installed workflows stored in Alfred's preferences doesn't exist: $wfRootFolder"
 
   # Construct the full symlink path.
-  symlinkPath="$wfRootFolder/$DEV_WF_NAMEPREFIX$(basename "$wfDevFolder")"
+  symlinkPath="$wfRootFolder/${DEV_WF_NAMEPREFIX}${symlinkName}"
 
   # See if a symlink to *this* dev. folder already exists among the installed workflows.
   existingSymlinkPath=$(getSymlinkTo "$wfDevFolder" "$wfRootFolder") # Note: This may or may not be the same as $symlinkPath.
