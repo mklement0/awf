@@ -2,7 +2,7 @@
 
 THIS_NAME=$(basename "$BASH_SOURCE")
 # Note: the following line is automatically updated by `make version ...`
-THIS_VERSION=v0.1.0-1
+THIS_VERSION=v0.1.0-2
 
 # Helper function for exiting with error message due to runtime error.
 #   die [errMsg [exitCode]]
@@ -859,6 +859,35 @@ getInstalledWfFolderByBundleId() {
   return 1
 }
 
+# makeSymlinkPath <devFolderPath>
+# When using `awf todev` or `awf link`, construct the full symlink path based on 
+# a suitable name for the symlink to be created among the installed workflows, 
+# prefixed with ${DEV_WF_NAMEPREFIX}.
+#
+# If the *parent* folder of <devFolderPath> is an (npm-style) package project, assume the workflow is part of a published
+# package and use the *parent* folder's name instead, which is assumed to be project-specific.
+# (By contrast, the source folder *inside* a package will typically have a *generic* name, such as 'workflow'.)
+# Otherwise, use <devFolderPath>'s own folder name.
+makeSymlinkPath() {
+  local wfDevFolder=$1 symlinkCoreName symlinkPath
+  # Make sure that '.' is expanded to a full path, so we can apply `dirname` and `basename` below.
+  [[ $wfDevFolder == '.' ]] && wfDevFolder="$PWD"
+  # Determine the full path of the symlink to create among the installed workflows...
+  # Determine the core of the symlink name (will be suffixed with ${DEV_WF_NAMEPREFIX}):
+  if [[ -f "$wfDevFolder"/../package.json ]]; then
+    # If the *parent* folder is an (npm-style) package project, assume the workflow is part of a published
+    # package and use the *parent* folder's name instead, which is assumed to be descriptive.
+    # (By contrast, the source folder *inside* a package will typically have a *generic* name, such as 'workflow'.)
+    symlinkCoreName=$(basename -- "$(dirname -- "$wfDevFolder")")
+  else
+    # Use the current folder name.
+    symlinkCoreName=$(basename -- "$wfDevFolder")
+  fi
+  # Synthesize the full path.
+  symlinkPath="$(getInstalledWfsRootFolder)/${DEV_WF_NAMEPREFIX}${symlinkCoreName}"
+  printf '%s\n' "$symlinkPath"
+}
+
 # SYNOPSIS
 #   warnIfBundleIdMissing [wfFolder]
 warnIfBundleIdMissing() {
@@ -1453,18 +1482,7 @@ moveToDevAndLink() {
   done
 
   # Determine the full path of the symlink to create among the installed workflows...
-  # Determine the core of the symlink name (will be suffixed with ${DEV_WF_NAMEPREFIX}):
-  if [[ -f "$wfNewDevFolder"/../package.json ]]; then
-    # If the *parent* folder is an (npm-style) package project, assume the workflow is part of a published
-    # package and use the *parent* folder's name instead, which is assumed to be descriptive.
-    # (By contrast, the source folder *inside* a package will typically have a *generic* name, such as 'workflow'.)
-    symlinkCoreName=$(basename -- "$(dirname -- "$wfNewDevFolder")")
-  else
-    # Use the current folder name.
-    symlinkCoreName=$(basename -- "$wfNewDevFolder")
-  fi
-  # Synthesize the full path.
-  symlinkPath="$(getInstalledWfsRootFolder)/${DEV_WF_NAMEPREFIX}${symlinkCoreName}"
+  symlinkPath=$(makeSymlinkPath "$wfNewDevFolder")
   # ... and make sure it doesn't already exist.
   [[ ! -e $symlinkPath ]] || die "Symlink to be created already exists: $symlinkPath"
 
@@ -1656,7 +1674,7 @@ pruneDeadSymlinks() {
 
 
 # SYNOPSIS
-#   linkDevToInstalled [-f] [wfDevFolder [symlinkName]]
+#   linkDevToInstalled [-f] [wfDevFolder [symlinkCoreName]]
 linkDevToInstalled() {
 
   local wfDevFolder wfRootFolder symlinkFilename plistFile bundleId symlinkPath existingSymlinkPath existingWfFolder
@@ -1686,7 +1704,7 @@ linkDevToInstalled() {
   case $# in
     0|1|2)
       wfDevFolder=${1:-$PWD}
-      symlinkName=${2:-$(basename -- "$wfDevFolder")}
+      symlinkCoreName=$2
       ;;
     *)
       dieSyntax "Unexpected number of arguments specified."
@@ -1695,6 +1713,13 @@ linkDevToInstalled() {
 
   # Verify existence of and obtain absolute path of explicit or implied dev workflow folder.
   wfDevFolder=$(getAndVerifyDevWfFolder "$wfDevFolder") || exit
+
+  # Construct the full symlink path.
+  if [[ -z $symlinkCoreName ]]; then # derive core symlink name from dev folder
+    symlinkPath=$(makeSymlinkPath "$wfDevFolder")
+  else # use given core symlink name
+    symlinkPath="$wfRootFolder/${DEV_WF_NAMEPREFIX}${symlinkCoreName}"
+  fi
 
   # Next, extract the bundle ID from the 'info.plist' file in the workflow folder, if present.
   plistFile="$wfDevFolder/info.plist"
@@ -1705,8 +1730,6 @@ linkDevToInstalled() {
   wfRootFolder=$(getInstalledWfsRootFolder)
   [[ -d $wfRootFolder ]] || die "Root folder of installed workflows stored in Alfred's preferences doesn't exist: $wfRootFolder"
 
-  # Construct the full symlink path.
-  symlinkPath="$wfRootFolder/${DEV_WF_NAMEPREFIX}${symlinkName}"
 
   # See if a symlink to *this* dev. folder already exists among the installed workflows.
   existingSymlinkPath=$(getSymlinkTo "$wfDevFolder" "$wfRootFolder") # Note: This may or may not be the same as $symlinkPath.
