@@ -2,7 +2,7 @@
 
 THIS_NAME=$(basename "$BASH_SOURCE")
 # Note: the following line is automatically updated by `make version ...`
-THIS_VERSION=v0.1.0-0
+THIS_VERSION=v0.1.0-1
 
 # Helper function for exiting with error message due to runtime error.
 #   die [errMsg [exitCode]]
@@ -1418,13 +1418,15 @@ moveToDevAndLink() {
     wfInstalledFolder=$(getInstalledWfFolderByBundleId "$wfInstalledFolderOrBundleID")
     [[ -n $wfInstalledFolder ]] || die "Specified bundle ID not found among installed workflows - no such workflow installed: $wfInstalledFolderOrBundleID"
   else
-    # Verify existence of and obtain absolute path of explicit or implied dev workflow folder.
+    # Verify existence of and obtain absolute path of explicit or implied installed workflow folder.
     wfInstalledFolder=$(getAndVerifyInstalledWfFolder "$wfInstalledFolderOrBundleID") || exit
   fi
   [[ ! -L $wfInstalledFolder ]] || die "Specified workflow folder is (already) a *symlink* (dev workflow); expected regular folder: $wfInstalledFolder"
 
   # [Prompt for] and verify eligibility of the target folder.
   devFolderOk=0 prompt=0 errMsg= startFolderClause= startFolder=
+  # If '.' was specified to target the current dir, expand it to its *full path*.
+  [[ $wfNewDevFolder == '.' ]] && wfNewDevFolder="$PWD"  
   [[ -z $wfNewDevFolder ]] && prompt=1
   while (( ! devFolderOk )); do
     if (( prompt )); then
@@ -1451,9 +1453,21 @@ moveToDevAndLink() {
   done
 
   # Determine the full path of the symlink to create among the installed workflows...
-  symlinkPath="$(getInstalledWfsRootFolder)/$DEV_WF_NAMEPREFIX$(basename "$wfNewDevFolder")"
+  # Determine the core of the symlink name (will be suffixed with ${DEV_WF_NAMEPREFIX}):
+  if [[ -f "$wfNewDevFolder"/../package.json ]]; then
+    # If the *parent* folder is an (npm-style) package project, assume the workflow is part of a published
+    # package and use the *parent* folder's name instead, which is assumed to be descriptive.
+    # (By contrast, the source folder *inside* a package will typically have a *generic* name, such as 'workflow'.)
+    symlinkCoreName=$(basename -- "$(dirname -- "$wfNewDevFolder")")
+  else
+    # Use the current folder name.
+    symlinkCoreName=$(basename -- "$wfNewDevFolder")
+  fi
+  # Synthesize the full path.
+  symlinkPath="$(getInstalledWfsRootFolder)/${DEV_WF_NAMEPREFIX}${symlinkCoreName}"
   # ... and make sure it doesn't already exist.
   [[ ! -e $symlinkPath ]] || die "Symlink to be created already exists: $symlinkPath"
+
 
   # Copy *contents* of installed folder to dev folder.
   cp -a "${wfInstalledFolder%/}/" "$wfNewDevFolder" || die "Failed to copy contents of '$wfInstalledFolder' to '$wfNewDevFolder'."
