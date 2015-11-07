@@ -1,5 +1,10 @@
 ## Changelog
 
+* **[v0.2.2](https://github.com/mklement0/awf/compare/v0.2.1...v0.2.2)** (2015-11-07):
+  * [doc] Typo fixed.
+  * [dev] Automatic TOC generation for `README.md` disabled for now, because `doctoc`
+          doesn't parse the "Usage" chapter correctly.
+
 * **[v0.2.1](https://github.com/mklement0/awf/compare/v0.2.0...v0.2.1)** (2015-11-07):
   * [doc] TOC added to `README.md`
 
@@ -27,5 +32,4 @@
 
 * **v0.1.0-0** (2015-10-28):
   * [doc] CLI help improved.
-
 

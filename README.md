@@ -3,6 +3,12 @@
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
+<!-- !!!!
+  AUTOMATIC TOC GENERATION IS CURRENTLY DISABLED, because doctoc incorrectly 
+  parses the "Usage" chapter.
+  FOR NOW, KEEP THE TOC *MANUALLY* IN SYNC, IF YOU CHANGE THE DOCUMENT STRUCTURE.
+!!!  -->
+
 **Contents**
 
 - [awf &mdash; a CLI for managing Alfred 2 workflows](#awf-&mdash-a-cli-for-managing-alfred-2-workflows)
@@ -123,7 +129,7 @@ With [Node.js](http://nodejs.org/) installed, install [the package](https://www.
 ## Usage
 
 `awf` currently does _not_ have a `man` page, but its manual is accessible
-throug the `help` sub-command:
+through the `help` sub-command:
 
 * `awf help` (or `awf -h`) gives a concise overview of all subcommands.
 * `awf help all` additionally prints detailed descriptions of all subcommands.
@@ -672,6 +678,11 @@ This project gratefully depends on the following open-source components, accordi
 <!-- DO NOT EDIT THE NEXT CHAPTER and RETAIN THIS COMMENT: The next chapter is updated by `make update-readme/release` with the contents of 'CHANGELOG.md'. ALSO, LEAVE AT LEAST 1 BLANK LINE AFTER THIS COMMENT. -->
 
 ## Changelog
+
+* **[v0.2.2](https://github.com/mklement0/awf/compare/v0.2.1...v0.2.2)** (2015-11-07):
+  * [doc] Typo fixed.
+  * [dev] Automatic TOC generation for `README.md` disabled for now, because `doctoc`
+          doesn't parse the "Usage" chapter correctly.
 
 * **[v0.2.1](https://github.com/mklement0/awf/compare/v0.2.0...v0.2.1)** (2015-11-07):
   * [doc] TOC added to `README.md`

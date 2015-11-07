@@ -1,6 +1,6 @@
 {
   "name": "awf",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "os": "darwin",
   "description": "CLI for managing Alfred 2 workflows (OS X only)",
   "bin": {
@@ -29,7 +29,7 @@
   "license": "MIT",
   "net_same2u": {
     "make_pkg": {
-      "tocOn": true,
+      "tocOn": false,
       "tocTitle": "**Contents**"
     }
   },
