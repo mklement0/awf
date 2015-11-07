@@ -1,5 +1,8 @@
 ## Changelog
 
+* **[v0.2.1](https://github.com/mklement0/awf/compare/v0.2.0...v0.2.1)** (2015-11-07):
+  * [doc] TOC added to `README.md`
+
 * **[v0.2.0](https://github.com/mklement0/awf/compare/v0.1.0-3...v0.1.0)** (2015-11-07):
   * First release.
   * [change] `afw version` now expects the version number/increments specifier _before_ the target-folder operand; `''` is now
@@ -24,4 +27,5 @@
 
 * **v0.1.0-0** (2015-10-28):
   * [doc] CLI help improved.
+
 

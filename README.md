@@ -1,5 +1,28 @@
 [![npm version](https://img.shields.io/npm/v/awf.svg)](https://npmjs.com/package/awf) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/mklement0/awf/blob/master/LICENSE.md)
 
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+
+**Contents**
+
+- [awf &mdash; a CLI for managing Alfred 2 workflows](#awf-&mdash-a-cli-for-managing-alfred-2-workflows)
+    - [Retrieving information about workflows](#retrieving-information-about-workflows)
+    - [Locating workflows](#locating-workflows)
+    - [Editing workflows](#editing-workflows)
+    - [Installing and exporting workflows](#installing-and-exporting-workflows)
+    - [Developing workflows](#developing-workflows)
+- [Installation](#installation)
+  - [Prerequisites](#prerequisites)
+  - [Installation from the npm registry](#installation-from-the-npm-registry)
+  - [Manual installation](#manual-installation)
+- [Usage](#usage)
+- [License](#license)
+  - [Acknowledgements](#acknowledgements)
+  - [npm dependencies](#npm-dependencies)
+- [Changelog](#changelog)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 # awf &mdash; a CLI for managing Alfred 2 workflows
 
 `awf` (***A***lfred ***W***ork***f***low) is an OS X CLI for managing and
@@ -649,6 +672,9 @@ This project gratefully depends on the following open-source components, accordi
 <!-- DO NOT EDIT THE NEXT CHAPTER and RETAIN THIS COMMENT: The next chapter is updated by `make update-readme/release` with the contents of 'CHANGELOG.md'. ALSO, LEAVE AT LEAST 1 BLANK LINE AFTER THIS COMMENT. -->
 
 ## Changelog
+
+* **[v0.2.1](https://github.com/mklement0/awf/compare/v0.2.0...v0.2.1)** (2015-11-07):
+  * [doc] TOC added to `README.md`
 
 * **[v0.2.0](https://github.com/mklement0/awf/compare/v0.1.0-3...v0.1.0)** (2015-11-07):
   * First release.
