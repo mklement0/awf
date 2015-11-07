@@ -1,8 +1,8 @@
 {
   "name": "awf",
-  "version": "0.1.0-3",
+  "version": "0.2.0",
   "os": "darwin",
-  "description": "CLI for managing Alfred workflows (OS X only)",
+  "description": "CLI for managing Alfred 2 workflows (OS X only)",
   "bin": {
     "awf": "bin/awf"
   },
@@ -19,9 +19,10 @@
     "test": "make test"
   },
   "keywords": [
-    "Alfred",
+    "osx",
+    "alfred",
     "workflows",
-    "helper",
+    "awf",
     "CLI"
   ],
   "author": "Michael Klement <mklement0@gmail.com> (http://same2u.net)",

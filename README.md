@@ -1,23 +1,111 @@
-![project status - not ready for release](https://img.shields.io/badge/status-not_ready_for_release-red.svg)
+[![npm version](https://img.shields.io/npm/v/awf.svg)](https://npmjs.com/package/awf) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/mklement0/awf/blob/master/LICENSE.md)
 
-[![license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/mklement0/awf/blob/master/LICENSE.md)
+# awf &mdash; a CLI for managing Alfred 2 workflows
 
-# awf - a CLI for managing Alfred workflows
+`awf` (***A***lfred ***W***ork***f***low) is an OS X CLI for managing and
+assisting in the development of [workflows](https://www.alfredapp.com/workflows/) for
+command-line launcher [Alfred 2](http://alfredapp.com).
 
-[DO NOT USE YET.]
+It comes with a broad range of features:
 
-`awf` (*A*lfred *W*ork*f*low) is a helper CLI for OS X users who frequently develop workflows for command-line launcher [Alfred 2](http://alfredapp.com).
+Note: Some features related to `Alfred Preferences.app` involve GUI scripting 
+and therefore require that the application running `awf` - typically, `Terminal.app` -
+be granted access to accessibility features - you will be prompted for authorization
+on first use; for more information, see [Apple's support article on the subject](https://support.apple.com/en-us/HT202802).
+
+## Retrieving information about workflows
+
+* List all workflows or workflows matching a filter, optionally with selectable output fields.
+  * `awf list -s i net.same2u. # list matching workflows by bundle ID substring`
+* Print information about a given workflow.
+  * `awf info net.same2u.speak.awf`
+
+## Locating workflows
+
+* Locate a workflow's installation folder by its bundle ID.
+  * `awf which net.same2u.speak.awf # prints installation folder path`
+* Reveal a workflow's folder in Finder.
+  * `awf reveal net.same2u.speak.awf`
+* Trigger a keyword search for workflows in Alfred Preferences.
+  * `awf search speak`
+
+## Editing workflows
+
+* Change to a workflow's folder in Terminal.
+   * `awf cd net.same2u.speak.awf # opens a tab in a new window`
+* Open a workflow in Alfred Preferences for editing.
+   * `awf edit net.same2u.speak.awf`
+   * `awf edit # from a workflow source folder`
+
+## Installing and exporting workflows
+
+* Install a (copy of a) workflow from a source folder.
+   * `awf install .`
+* Export a `*.alfredworkflow` archive from a source folder.
+   * `awf export . # exports to '*.alfredworkflow' in same folder by default`
+
+## Developing workflows
+
+Note:
+
+* The purpose of the following features is to allow you to store workflows being
+developed in a _separate location_ instead of directly among the installed workflows.
+A _symlink_ to the dev location placed among the installed folders ensures that 
+you can still use and develop the workflow from within Alfred and Alfred Preferences.
+* These features move directories, create symlinks, and delete files.
+  Care is taken not to accidentally overwrite or delete files, but
+  _use these features with caution and always create backups_.
+
+<hr/>
+
+* Symlink a dev folder (source folder) into the folder of installed worklows or remove a dev folder's symlink.
+  * `awf link . # effective installation without moving the directory`
+  * `awf unlink . # remove a symlink - effective uninstallation`
+* Move an existing, regular workflow to a dev folder in a different location and replace the original workflow folder with a symlink to the dev folder.
+  * `awf todev net.same2u.speak . # move to current folder and perform 'awf link'`
+* Conversely, move a dev folder back to the folder of installed workflows as a regularly installed workflow.
+  * `awf fromdev . # -k keeps the source folder`
+* Manage workflow version numbers via file `version`.
+  * `awf version patch # bumps the patch component of the workflow's version number`
+
+The [Usage](#usage) chapter contains the full manual.
 
 ## Installation
 
-### Manual Installation
+## Prerequisites
 
-* Clone this repository locally.
-* Copy `bin/awf` to a folder in your `$PATH`, e.g.:
+ * OS X 10.10
+ * [Alfred 2](http://alfredapp.com) with its paid [Power Pack](https://www.alfredapp.com/powerpack/) add-on.
+ 
+## Installation from the npm registry
 
-        cp bin/awf /usr/local/bin/
+ <sup>Note: Even if you don't use Node.js itself: its package manager, `npm`, works across platforms and is easy to install; try  
+ [`curl -L http://git.io/n-install | bash`](https://github.com/mklement0/n-install)</sup>
+
+With [Node.js](http://nodejs.org/) installed, install [the package](https://www.npmjs.com/package/awf) as follows:
+
+    [sudo] npm install -g awf
+
+**Note**:
+
+* Whether you need `sudo` depends on how you installed Node.js and whether you've [changed permissions later](https://docs.npmjs.com/getting-started/fixing-npm-permissions); if you get an `EACCES` error, try again with `sudo`.
+* The `-g` ensures [_global_ installation](https://docs.npmjs.com/getting-started/installing-npm-packages-globally) and is needed to put `awf` in your system's `$PATH`.
+
+## Manual installation
+
+* Download [the CLI](https://raw.githubusercontent.com/mklement0/awf/stable/bin/awf) as `awf`.
+* Make it executable with `chmod +x awf`.
+* Move it or symlink it to a folder in your `$PATH`, such as `/usr/local/bin`.
 
 ## Usage
+
+`awf` currently does _not_ have a `man` page, but its manual is accessible
+throug the `help` sub-command:
+
+* `awf help` (or `awf -h`) gives a concise overview of all subcommands.
+* `awf help all` additionally prints detailed descriptions of all subcommands.
+* `awf help <sub-command>` prints the detailed description of the specified subcommand;
+e.g., `awf help list`
 
 <!-- DO NOT EDIT THE FENCED CODE BLOCK and RETAIN THIS COMMENT: The fenced code block below is updated by `make update-readme/release` with CLI usage information. -->
 
@@ -48,7 +136,7 @@ SYNOPSIS
 
   awf install         [wfDevFolder]
     Installs a workflow from a dev folder.
-  awf export  [-R]    [wfFolder [outFolder]]
+  awf export  [-R]    [wfFolderOrBundleID [outFolder]]
     Exports a workflow to an *.alfredworkflow ZIP archive.
 
   awf link|ln [-f]    [wfDevFolder [symlinkName]]
@@ -61,7 +149,7 @@ SYNOPSIS
     Converts an installed workflow to a dev workflow.
   awf fromdev [-k]    [wfDevFolder]
     Converts a dev workflow to a regular installed workflow.
-  awf version [-f] [wfFolderOrBundleId [newVersion|'major|'minor'|'patch']]
+  awf version [-f] [newVersion|'major|'minor'|'patch' [wfFolderOrBundleId]]
     Prints or assigns a workflow's version number.
 
   awf help [command | 'all']  # or: awf command -h
@@ -89,6 +177,8 @@ DESCRIPTION
 
   In commands where a bundle ID can be specified to target a workflow, only
   *installed* workflows are searched for said bundle ID.
+
+  For license information and more, visit https://github.com/mklement0/awf
 
 
 ---
@@ -145,7 +235,7 @@ DESCRIPTION
 
   -x
     Exact matching; the search term must match (one of) the specified or
-    implied search field(s) literally and in full.
+    implied search field(s) literally and in full (except for case).
 
   -r
     Regex matching; the search term is interpreted as an extended
@@ -238,8 +328,8 @@ EXAMPLES
     # Print metadata for workflow in current folder:
   awf info  
     # Print name and bundleID fields without field names for
-    # workflow with bundle ID 'net.same2u.alfw.StringLength':
-  awf info -b -o ni net.same2u.alfw.StringLength
+    # workflow with bundle ID 'net.same2u.speak.awf':
+  awf info -b -o ni net.same2u.speak.awf
 
 ---
   awf id              [wfFolder]
@@ -280,10 +370,10 @@ DESCRIPTION
 EXAMPLES
     # Print the installed location (only) of the dev workflow stored
     # in the current folder:
-  awf which -b
+  awf which
     # Print the installed location and, if applicable, the underlying
     # dev location of the workflow with the specified bundle ID:
-  awf which net.same2u.alfw.StringLength
+  awf which -l net.same2u.speak.awf
 
 ---
   awf reveal [-P]     [wfDevFolderOrBundleID | '/']
@@ -303,7 +393,7 @@ DESCRIPTION
 EXAMPLES
     # Reveal the location of the workflow with the specified bundle ID
     # in Finder:
-  awf reveal net.same2u.alfw.StringLength
+  awf reveal net.same2u.speak.awf
 
 ---
   awf cd [-P]         [wfFolderOrBundleID | '/']
@@ -319,6 +409,8 @@ DESCRIPTION
   -P
     If the workflow is symlinked to a dev folder, the underlying dev folder
     is changed to, not the symlinked path among the installed workflows.
+    Note that you can always run `pwd -P` to get a symlinked directory's true
+    underlying path.
 
   Note: Since this script cannot change the current shell's working folder,
         a new shell in a new Terminal window must be opened.
@@ -326,7 +418,7 @@ DESCRIPTION
 EXAMPLES
     # Open a new Terminal window and change to the folder of the
     # (installed) workflow with the specified bundle ID:
-  awf cd net.same2u.alfw.StringLength
+  awf cd net.same2u.speak.awf
 
 ---
   awf edit            [wfFolderOrBundleID]
@@ -372,16 +464,17 @@ DESCRIPTION
     .* *.alfredworkflow
 
 ---
-  awf export  [-R]    [wfFolder [outFolder]]
+  awf export  [-R]    [wfFolderOrBundleID [outFolder]]
     Exports a workflow to an *.alfredworkflow ZIP archive.
 
 DESCRIPTION
   Exports a workflow by creating an *.alfredworkflow ZIP
   archive for later installation (import).
-  The archive is always created with the folder's name as the
-  filename root of the archive, and placed in the workflow folder itself
-  by default.
-
+  By default, the archive is placed in the workflow folder itself.
+  The archive filename root is the workflow's bundle ID, if defined.
+  Otherwise, it is the workflow folder's name, or, if the workflow's parent 
+  folder is an npm-style package, the parent folder's name.
+  
   -R
     reveals the resulting archive in Finder.
 
@@ -397,7 +490,9 @@ DESCRIPTION
   that installed workflow's folder is the very same symlink about to be
   created, no error is reported and no action is performed.
   The symlink's name will be 'dev.workflow.<symlinkName>'.
-  <symlinkName> defaults to the name of the dev workflow folder.
+  <symlinkName> defaults to the workflow's bundle ID, if defined.
+  Otherwise, it is the workflow folder's name, or, if the workflow's parent 
+  folder is an npm-style package, the parent folder's name.
 
   -f 
     Force creation of the symlink: If an installed workflow has the
@@ -463,46 +558,46 @@ DESCRIPTION
     independent copy of the newly installed workflow.
 
 ---
-  awf version [-f] [wfFolderOrBundleId [newVersion|'major|'minor'|'patch']]
+  awf version [-f] [newVersion|'major|'minor'|'patch' [wfFolderOrBundleId]]
     Prints or assigns a workflow's version number.
 
 DESCRIPTION
-  Returns or sets a workflow's version number, optionally by inrementing
+  Returns or sets a workflow's version number, optionally by incrementing
   a component of the current version number.
 
-  The workflow may be specified by folder path or bundle ID; defaults is the
+  The workflow may be specified by folder path or bundle ID; default is the
   current folder.
   
-  Without specifying a new version, the workflow's current version is output.
+  Without specifying a new version or when passing an empty string,
+  the workflow's current version is output.
   If there is none, the exit code is set to 2, and a warning is printed.
 
-  Valid version numbers have 1-3 .-separated components, and each component
-  must be composed of digits only. The component names are:
-  major, minor, and patch.
+  Valid version numbers have 3 .-separated components, and each component
+  must be composed of digits only (pre-release version numbers are not
+  supported). The component names are: major, minor, and patch.
   
   As an alternative to directly specifying a new version number, an
   increment specifier may be used.
   Supported increment specifiers are 'major', 'minor', 'patch', which
   increment (by 1) the respective version component of the current
   version number. A missing component is treated as 0.
-  Any lower components are set as follows: the minor component is set to 0,
-  the patch component is omitted.
   Caveat: any 0-padding of components is lost in the process.
 
   -f
     Forces updating the version number, even if the new version number is
-    lower than the current one, or the current version number is invalid.
+    lower than the current one, or if the current version number is invalid.
 
   A workflow's version number is by convention stored in a plain-text file
   named 'version' in the workflow's folder. The file must without exception
-  contain a version number only, and the file must have 1 line only; no whitespace allowed.
+  contain a version number only, and the file must have 1 line only;
+  no whitespace allowed.
 
 EXAMPLES
-    # Print version of the workflow in the current folder:
+    # Print version number of the workflow in the current folder:
   awf version
     # Increment the patch component of the version number of the workflow
     # in the current folder (e.g., 0.5.1 -> 0.5.2)
-  awf version . patch
+  awf version patch
 
 
 ---
@@ -554,6 +649,14 @@ This project gratefully depends on the following open-source components, accordi
 <!-- DO NOT EDIT THE NEXT CHAPTER and RETAIN THIS COMMENT: The next chapter is updated by `make update-readme/release` with the contents of 'CHANGELOG.md'. ALSO, LEAVE AT LEAST 1 BLANK LINE AFTER THIS COMMENT. -->
 
 ## Changelog
+
+* **[v0.2.0](https://github.com/mklement0/awf/compare/v0.1.0-3...v0.1.0)** (2015-11-07):
+  * First release.
+  * [change] `afw version` now expects the version number/increments specifier _before_ the target-folder operand; `''` is now
+    needed to explicitly ask to _get_ the current version when also specifying a target-folder operand.
+  * [change] `afw export` now uses a workflow's bundle ID as the filename root by default.
+  * [change] Options may now be intermingled with operands (though the sub-command must still be the very first argument).
+  * [fix] Various small fixes.
 
 * **[v0.1.0-3](https://github.com/mklement0/awf/compare/v0.1.0-2...v0.1.0-3)** (2015-10-28):
   * [fix] `awf export` should now work as advertised (support for output-folder argument, resolution of relative paths).
