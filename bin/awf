@@ -3,7 +3,7 @@
 kTHIS_NAME=${BASH_SOURCE##*/}
 kTHIS_HOMEPAGE='https://github.com/mklement0/awf'
 # Note: the following line is automatically updated by `make version ...`
-kTHIS_VERSION=v0.2.2
+kTHIS_VERSION=v0.2.3
 
 
 # Helper function for exiting with error message due to runtime error.

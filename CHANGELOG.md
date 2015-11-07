@@ -1,5 +1,8 @@
 ## Changelog
 
+* **[v0.2.3](https://github.com/mklement0/awf/compare/v0.2.2...v0.2.3)** (2015-11-07):
+  * [doc] `README.md`: Removed spurious 10.10 requirement; copy-editing.
+
 * **[v0.2.2](https://github.com/mklement0/awf/compare/v0.2.1...v0.2.2)** (2015-11-07):
   * [doc] Typo fixed.
   * [dev] Automatic TOC generation for `README.md` disabled for now, because `doctoc`

@@ -103,7 +103,7 @@ The [Usage](#usage) chapter contains the full manual.
 
 ## Prerequisites
 
- * OS X 10.10
+ * OS X
  * [Alfred 2](http://alfredapp.com) with its paid [Power Pack](https://www.alfredapp.com/powerpack/) add-on.
  
 ## Installation from the npm registry
@@ -131,9 +131,9 @@ With [Node.js](http://nodejs.org/) installed, install [the package](https://www.
 `awf` currently does _not_ have a `man` page, but its manual is accessible
 through the `help` sub-command:
 
-* `awf help` (or `awf -h`) gives a concise overview of all subcommands.
-* `awf help all` additionally prints detailed descriptions of all subcommands.
-* `awf help <sub-command>` prints the detailed description of the specified subcommand;
+* `awf help` (or `awf -h`) gives a concise overview of all sub-commands.
+* `awf help all` additionally prints detailed descriptions of all sub-commands.
+* `awf help <sub-command>` prints the detailed description of the specified sub-command;
 e.g., `awf help list`
 
 <!-- DO NOT EDIT THE FENCED CODE BLOCK and RETAIN THIS COMMENT: The fenced code block below is updated by `make update-readme/release` with CLI usage information. -->
@@ -678,6 +678,9 @@ This project gratefully depends on the following open-source components, accordi
 <!-- DO NOT EDIT THE NEXT CHAPTER and RETAIN THIS COMMENT: The next chapter is updated by `make update-readme/release` with the contents of 'CHANGELOG.md'. ALSO, LEAVE AT LEAST 1 BLANK LINE AFTER THIS COMMENT. -->
 
 ## Changelog
+
+* **[v0.2.3](https://github.com/mklement0/awf/compare/v0.2.2...v0.2.3)** (2015-11-07):
+  * [doc] `README.md`: Removed spurious 10.10 requirement; copy-editing.
 
 * **[v0.2.2](https://github.com/mklement0/awf/compare/v0.2.1...v0.2.2)** (2015-11-07):
   * [doc] Typo fixed.
