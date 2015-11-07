@@ -3,7 +3,7 @@
 kTHIS_NAME=${BASH_SOURCE##*/}
 kTHIS_HOMEPAGE='https://github.com/mklement0/awf'
 # Note: the following line is automatically updated by `make version ...`
-kTHIS_VERSION=v0.2.3
+kTHIS_VERSION=v0.2.4
 
 
 # Helper function for exiting with error message due to runtime error.
@@ -676,10 +676,10 @@ isInSubtree() {
   local paths=("$1" "$2") childrenOnly=${3:-0}
   for (( i = 0; i < "${#paths[@]}"; i++ )); do
     if [[ -d ${paths[i]} ]]; then # path is extant folder, normalize it.
-        paths[i]=$(cd "${paths[i]}"; echo "$PWD")
+        paths[i]=$(cd -- "${paths[i]}" && pwd) || die
     elif [[ -d $(dirname "${paths[i]}") ]]; then # parent path exists, normalize it and append last component
       name=$(basename "${paths[i]}"); [[ $name == '/' ]] && name=''
-      fldr=$(cd "$(dirname "${paths[i]}")"; echo "$PWD")
+      fldr=$(cd -- "$(dirname -- "${paths[i]}")" && pwd) || die
       paths[i]=${fldr%/}/$name
     else # non-extant path, perform courtesy prefix normalizations
       case "${paths[i]}" in
@@ -687,7 +687,7 @@ isInSubtree() {
           paths[i]=${PWD%/}/${paths[i]:2}
           ;;
         ../*) # replace '../' prefix with normalized parent dir.
-          fldr=$(cd "${PWD%/}/.."; echo "$PWD")
+          fldr=$(cd -- "${PWD%/}/.." && pwd) || die
           paths[i]=${fldr%/}/${paths[i]:3}
           ;;
         /*) # already an absolute path, nothing to do.
@@ -748,7 +748,7 @@ getSymlinkTo() {
     [[ -d $f ]] || { echo "ERROR: Folder not found: $f" >&2; return 1; }
   done
   # Resolve the putative parent folder to an absolute, normalized path.
-  putativeSymlinkParentFolder=$(cd "$putativeSymlinkParentFolder"; echo "$PWD")
+  putativeSymlinkParentFolder=$(cd -- "$putativeSymlinkParentFolder" && pwd) || die
   # Determine platform-specific option for `stat`.
   formatOpt='-c'
   [[ $(uname) == 'Darwin' ]] && formatOpt='-f'
@@ -812,16 +812,16 @@ getAndVerifyWfFolder() {
 
   local wfFolder=${1:-.} # default to current folder.
   local wfType=${2:-0} # 0 == unspecified, 1 == dev workflow, 2 == installed workflow
-  local WF_TYPE_QUALIFIERS=('' 'Dev ' 'Installed ')
+  local WF_TYPE_QUALIFIERS=( '' 'Dev ' 'Installed ' )
   local wfTypeQualifier=${WF_TYPE_QUALIFIERS[$wfType]}
 
   [[ -d $wfFolder ]] || die "${wfTypeQualifier}workflow folder not found: $wfFolder"
 
   # Expand to absolute path.
-  wfFolder=$(cd "$wfFolder"; echo "$PWD")
+  wfFolder=$(cd -- "$wfFolder" && pwd) || die
 
   # Make sure the target folder is actually an Alfred workflow folder.
-  isWfFolder "$wfFolder" || die "Specified ${wfTypeQualifier}workflow folder does not contain an Alfred workflow: ${wfFolder/#$PWD/.}"
+  isWfFolder "$wfFolder" || die "${wfTypeQualifier}workflow folder does not contain an Alfred workflow: ${wfFolder/#$PWD/.}"
 
   wfsRootFolder=$(getInstalledWfsRootFolder)
 
@@ -888,7 +888,7 @@ getInstalledWfFolderByBundleId() {
   local bundleId=$1 wfRootFolder
   wfRootFolder=$(getInstalledWfsRootFolder)
   for f in "$wfRootFolder/"*"/info.plist"; do
-    { /usr/libexec/PlistBuddy -c 'print "bundleid"' "$f" 2>/dev/null | fgrep -qix "$bundleId"; } && { echo "$(dirname "$f")"; return 0; }
+    { /usr/libexec/PlistBuddy -c 'print "bundleid"' "$f" 2>/dev/null | fgrep -qix "$bundleId"; } && { dirname -- "$f"; return 0; }
   done
   return 1
 }
@@ -1424,7 +1424,7 @@ exportWf() {
   if [[ -d $folderOrBundleId || $folderOrBundleId == */* ]]; then # folder specified
     [[ -d $folderOrBundleId ]] || die "Workflow folder not found: $folderOrBundleId"
     isWfFolder "$folderOrBundleId" || die "Folder does not contain an Alfred workflow: '${folderOrBundleId/#$PWD/.}'"
-    wfFolder=$(cd "$folderOrBundleId"; echo "$PWD")
+    wfFolder=$(cd -- "$folderOrBundleId" && pwd)
   else # bundle ID specified -> resolve to installed folder
     wfFolder=$(getInstalledWfFolderByBundleId "$folderOrBundleId")
     [[ -n $wfFolder ]] || die "Bundle ID not found among installed workflows: $folderOrBundleId"
@@ -1602,7 +1602,7 @@ getWfInfo() {
   if [[ -d $folderOrBundleId || $folderOrBundleId == */* ]]; then # folder specified
     [[ -d $folderOrBundleId ]] || die "Workflow folder not found: $folderOrBundleId"
     isWfFolder "$folderOrBundleId" || die "Folder does not contain an Alfred workflow: '${folderOrBundleId/#$PWD/.}'"
-    wfFolder=$(cd "$folderOrBundleId"; echo "$PWD")
+    wfFolder=$(cd -- "$folderOrBundleId" && pwd)
     # Test, if currently installed.
     if isChild "$wfFolder" "$wfsRootFolder"; then
       isInstalled=1
@@ -1929,7 +1929,7 @@ unlinkDevFromInstalled() {
     isWfFolder "$folderOrBundleId" || die "Folder does not contain an Alfred workflow: ${folderOrBundleId/#$PWD/.}"
     wfsRootFolder=$(getInstalledWfsRootFolder)
     if isChild "$folderOrBundleId" "$wfsRootFolder"; then # an installed workflow folder was directly specified      
-      symlinkToRemove=$(cd "$folderOrBundleId"; echo "$PWD")
+      symlinkToRemove=$(cd -- "$folderOrBundleId" && pwd) || die
     else # dev workflow folder specified: find symlink to it among installed workflows
       symlinkToRemove=$(getSymlinkTo "$folderOrBundleId" "$wfsRootFolder") || { echo "(Nothing to do: dev workflow folder is already not symlinked as an installed workflow: $folderOrBundleId)" >&2; exit 0; }
     fi
@@ -2211,13 +2211,13 @@ getInstalledWfFolder() {
       isWfFolder "$folderOrBundleId" || die "Folder does not contain an Alfred workflow: ${folderOrBundleId/#$PWD/.}"
       wfsRootFolder=$(getInstalledWfsRootFolder)
       if isChild "$folderOrBundleId" "$wfsRootFolder"; then # an installed workflow folder was directly specified - essentially, a noop (except for resolving to an absolute path )
-        wfFolder=$(cd "$folderOrBundleId"; echo "$PWD")
+        wfFolder=$(cd -- "$folderOrBundleId" && pwd) || die
       else # dev workflow folder specified: find symlink to it among installed workflows
         wfFolder=$(getSymlinkTo "$folderOrBundleId" "$wfsRootFolder") || die "Dev workflow folder is not symlinked as an installed workflow: $folderOrBundleId"
       fi
     else # bundle ID specified
       wfFolder=$(getInstalledWfFolderByBundleId "$bundleId")
-      [[ -n $wfFolder ]] || die "Specified bundle ID not found among installed workflows - no such workflow installed: $bundleId"
+      [[ -n $wfFolder ]] || die "Bundle ID not found among installed workflows - no such workflow installed: $bundleId"
     fi
   fi
 
@@ -2314,18 +2314,18 @@ changeToWfFolderInNewTerminalTab() {
       isWfFolder "$folderOrBundleId" || die "Workflow folder does not contain an Alfred workflow: ${folderOrBundleId/#$PWD/.}"
       wfsRootFolder=$(getInstalledWfsRootFolder)
       if isChild "$folderOrBundleId" "$wfsRootFolder"; then # an installed workflow folder was directly specified - essentially, a noop (except for resolving to an absolute path and also printing the dev path)
-        wfFolder=$(cd "$folderOrBundleId"; echo "$PWD")
+        wfFolder=$(cd -- "$folderOrBundleId" && pwd) || die
       else # dev workflow folder specified: find symlink to it among installed workflows
         wfFolder=$(getSymlinkTo "$folderOrBundleId" "$wfsRootFolder") || die "Dev workflow folder is not symlinked as an installed workflow: $folderOrBundleId"
       fi
     else # bundle ID specified
       wfFolder=$(getInstalledWfFolderByBundleId "$bundleId")
-      [[ -n $wfFolder ]] || die "Specified bundle ID not found among installed workflows - no such workflow installed: $bundleId"
+      [[ -n $wfFolder ]] || die "Bundle ID not found among installed workflows - no such workflow installed: $bundleId"
     fi
   fi
 
   if (( resolveToOriginal )); then
-    wfFolder=$(cd "$wfFolder"; pwd -P)
+    wfFolder=$(cd -- "$wfFolder" && pwd -P) || die
   fi
 
   # Use AppleScript to open a new Terminal.app window.
@@ -2395,22 +2395,27 @@ editWf() {
   # Special case: if the argument specified is '/' we simply open the Workflows tab in Alfred Preferences without searching.
   if [[ $folderOrBundleId == '/' ]]; then
     wfName=''
-  else # workflow folder specified or implied, or bundle ID specified
-    # Determine full path of workflow specified.
-    bundleId=$folderOrBundleId
+  else # workflow folder specified or implied, or bundle ID specified    
+    # Determine full path of the *installed* workflow implied by the operand.
     if [[ -d $folderOrBundleId || $folderOrBundleId == */* ]]; then # folder specified, resolve to bundle ID
       [[ -d $folderOrBundleId ]] || die "Workflow folder not found: $folderOrBundleId"
       isWfFolder "$folderOrBundleId" || die "Folder does not contain an Alfred workflow: '${folderOrBundleId/#$PWD/.}'"
-      bundleId=$(getWfBundleIdByFolder)
+      wfFolder=$folderOrBundleId
+      if isDevWfFolder "$folderOrBundleId"; then
+        # We must make sure that the dev folder is currently symlinked into the folder of installed workflows.
+        # If it isn't, it cannot actually be edited in Alfred Preferences.
+        isDevWfFolderInstalled "$folderOrBundleId" || die "Cannot edit, because this dev folder is not currently symlinked as an installed folder: $folderOrBundleId"
+      fi
+    else # assumed to be a bundle ID
+      # Resolve to installed folder path.
+      wfFolder=$(getInstalledWfFolderByBundleId "$folderOrBundleId") || die "Bundle ID not found among installed workflows: '$bundleId'"
     fi
-
-    wfFolder=$(getInstalledWfFolderByBundleId "$bundleId")
-    [[ -n $wfFolder ]] || die "Bundle ID not found among installed workflows: '$bundleId'"
+    # Extract the workflow name.
     wfName=$(getWfInfo -b -o n "$wfFolder") || die
   fi
 
-  # !! Given that we can't reveal a workflow by bundle ID in Alfred Preferences, the best we can do is to search by its full name
-  # !! and hope that the target workflow is the only match - which will typically, but not always, work.
+  # !! Given that we can't reveal a workflow by *bundle ID* in Alfred Preferences, the best we can do is to *search by its full name*
+  # !! and hope that the target workflow is the *only* match - this will typically, but not always, work.
   searchForWfsInAlfredPrefs "$wfName"
 
 }

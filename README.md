@@ -679,6 +679,12 @@ This project gratefully depends on the following open-source components, accordi
 
 ## Changelog
 
+* **[v0.2.4](https://github.com/mklement0/awf/compare/v0.2.3...v0.2.4)** (2015-11-07):
+  * [fix] `edit` sub-command now processes its operand correctly and now fails
+          in case a dev folder is specified that isn't currently symlinked as
+          an installed folder.
+  * [dev] Internal optimizations and stability improvements.
+
 * **[v0.2.3](https://github.com/mklement0/awf/compare/v0.2.2...v0.2.3)** (2015-11-07):
   * [doc] `README.md`: Removed spurious 10.10 requirement; copy-editing.
 

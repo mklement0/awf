@@ -1,6 +1,6 @@
 {
   "name": "awf",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "os": "darwin",
   "description": "CLI for managing Alfred 2 workflows (OS X only)",
   "bin": {
