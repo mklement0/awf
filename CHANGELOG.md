@@ -1,5 +1,7 @@
 ## Changelog
 
+<!-- NOTE: An entry template is automatically added each time `make version` is called. Fill in changes afterwards. -->
+
 * **[v0.2.4](https://github.com/mklement0/awf/compare/v0.2.3...v0.2.4)** (2015-11-07):
   * [fix] `edit` sub-command now processes its operand correctly and now fails
           in case a dev folder is specified that isn't currently symlinked as
