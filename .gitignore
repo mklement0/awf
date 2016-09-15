@@ -1,2 +1,5 @@
 
 node_modules/
+
+# urchin log files
+.urchin.log

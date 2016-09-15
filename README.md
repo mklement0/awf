@@ -11,7 +11,7 @@
 
 **Contents**
 
-- [awf &mdash; a CLI for managing Alfred 2 workflows](#awf-&mdash-a-cli-for-managing-alfred-2-workflows)
+- [awf &mdash; a CLI for managing Alfred workflows](#awf-&mdash-a-cli-for-managing-alfred-workflows)
     - [Retrieving information about workflows](#retrieving-information-about-workflows)
     - [Locating workflows](#locating-workflows)
     - [Editing workflows](#editing-workflows)
@@ -29,11 +29,11 @@
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
-# awf &mdash; a CLI for managing Alfred 2 workflows
+# awf &mdash; a CLI for managing Alfred workflows
 
 `awf` (***A***lfred ***W***ork***f***low) is an OS X CLI for managing and
 assisting in the development of [workflows](https://www.alfredapp.com/workflows/) for
-command-line launcher [Alfred 2](http://alfredapp.com).
+command-line launcher [Alfred](http://alfredapp.com) - versions 3 and 2 are supported.
 
 It comes with a broad range of features:
 
@@ -103,8 +103,8 @@ The [Usage](#usage) chapter contains the full manual.
 
 ## Prerequisites
 
- * OS X
- * [Alfred 2](http://alfredapp.com) with its paid [Power Pack](https://www.alfredapp.com/powerpack/) add-on.
+ * macOS (OS X)
+ * [Alfred](http://alfredapp.com) version 3 or 2 with its paid [Power Pack](https://www.alfredapp.com/powerpack/) add-on.
  
 ## Installation from the npm registry
 

@@ -17,29 +17,35 @@ PATH=${PWD%%/test*}/bin:$PATH
 die() { (( $# > 0 )) && echo "ERROR: $*" >&2; exit 1; }
 
 getTerminalWinCount() {
-  osascript -e 'tell application "Terminal" to count of windows'
+  if [[ $TERM_PROGRAM == 'iTerm.app' ]]; then
+    osascript -e 'tell application "iTerm.app" to count of windows'
+  else # Terminal.app
+    osascript -e 'tell application "Terminal" to count of windows'
+  fi
 }
 
-# getFrontTerminalWindowPwd() {
-#   osascript <<EOF
-# tell application "Terminal" to set ttab to do script "clear; pwd" in front window
-# delay 1
-# contents of contents of ttab
-# EOF
-
 getFrontTerminalWindowPwd() {
+
   # Create a temp. FILE
   local tmpFile=$(mktemp -t 'XXXX') # Works on both OSX and Linux; note: file will have random extension on OSX (e.g., '.../XXXX.bJViLcM3') and none on Linux (e.g., '.../vXDA')
 
-  # Send `pwd` with redirection to a temp. file to the front Terminal windows.
+  # Send `pwd` with redirection to a temp. file to the front Terminal window.
   # This is the most robust way to determine the working dir.
-  osascript <<EOF >/dev/null
-tell application "Terminal" to set ttab to do script "pwd >'${tmpFile}'" in front window
+  if [[ $TERM_PROGRAM == 'iTerm.app' ]]; then
+      # NOTE: Requires *iTerm2 v3+*, due to use of the new AppleScript syntax.
+      osascript <<EOF >/dev/null
+        tell application "iTerm.app" to tell the current session of the current window to write text "pwd >'${tmpFile}'"
 EOF
+  else # Terminal.app
+      osascript <<EOF >/dev/null
+        tell application "Terminal" to do script "pwd >'${tmpFile}'" in front window
+EOF
+  fi
+
   # !! We need to wait for the file to have content
   local timeout=5 i=0
   while [[ ! -s $tmpFile ]]; do
-    delay 1
+    sleep 1
     if (( ++i >= timeout )); then
       echo "TIMED OUT while waiting for cwd to be written to '$tmpFile'." >&2
       return 1
@@ -49,7 +55,11 @@ EOF
 }
 
 closeFrontTerminalWindow() {
-  osascript -e 'tell application "Terminal" to close front window'
+  if [[ $TERM_PROGRAM == 'iTerm.app' ]]; then
+    osascript -e 'tell application "iTerm.app" to close front window'
+  else # Terminal.app
+    osascript -e 'tell application "Terminal" to close front window'
+  fi
 }
 
 # ---------
@@ -61,8 +71,8 @@ export AWF_TEST_WFSROOTFOLDER="$kTEMP_DIR_PATH/workflows"
 [[ -d $kTEMP_DIR_PATH ]] || die "Test setup failure: Temp. folder created by ../setup_dir unexpectedly not found: $kTEMP_DIR_PATH"
 
 
-# ----
-echo "Changing to parent folder of all installed workflows..."
+# --------------  
+echo "Changing to root folder of all installed workflows..."
 
 winCountBefore=$(getTerminalWinCount)
 
@@ -80,12 +90,11 @@ closeFrontTerminalWindow
 
 [[ "$AWF_TEST_WFSROOTFOLDER" == "$cwd" ]] || die "Expected working dir '$AWF_TEST_WFSROOTFOLDER', got '$cwd'"
 
+# ------------ 
+echo "Changing to specific workflow folder by bundle ID..."
 
 bundleid='net.same2u.stringlength.awf'
 wfInstallPath=$(awf which "$bundleid") || die "Failed to determine workflow folder for bundle ID $bundleid"
-
-# ----
-echo "Changing to specific workflow folder by bundle ID..."
 
 winCountBefore=$(getTerminalWinCount)
 

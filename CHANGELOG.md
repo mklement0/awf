@@ -2,6 +2,11 @@
 
 <!-- NOTE: An entry template is automatically added each time `make version` is called. Fill in changes afterwards. -->
 
+* **[v0.3.0](https://github.com/mklement0/awf/compare/v0.2.4...v0.3.0)** (2016-09-15):
+  * [enhancement] Alfred 3 is now supported as well. If both Alfred 2 and Alfred 3
+                  are installed, Alfred 2 can be targeted by passing `-2` as the very
+                  first argument.
+
 * **[v0.2.4](https://github.com/mklement0/awf/compare/v0.2.3...v0.2.4)** (2015-11-07):
   * [fix] `edit` sub-command now processes its operand correctly and now fails
           in case a dev folder is specified that isn't currently symlinked as

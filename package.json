@@ -1,8 +1,10 @@
 {
   "name": "awf",
-  "version": "0.2.4",
-  "os": "darwin",
-  "description": "CLI for managing Alfred 2 workflows (OS X only)",
+  "version": "0.3.0",
+  "os": [
+    "darwin"
+  ],
+  "description": "CLI for managing Alfred workflows (macOS only)",
   "bin": {
     "awf": "bin/awf"
   },
@@ -19,6 +21,7 @@
     "test": "make test"
   },
   "keywords": [
+    "macOS",
     "osx",
     "alfred",
     "workflows",

@@ -3,7 +3,7 @@
 kTHIS_NAME=${BASH_SOURCE##*/}
 kTHIS_HOMEPAGE='https://github.com/mklement0/awf'
 # Note: the following line is automatically updated by `make version ...`
-kTHIS_VERSION=v0.2.4
+kTHIS_VERSION=v0.3.0
 
 
 # Helper function for exiting with error message due to runtime error.
@@ -107,11 +107,11 @@ cliHelp() {
     Prints the full path to an installed workflow's folder.    
   $kTHIS_NAME reveal [-P]     [wfDevFolderOrBundleID | '/']
     Reveals an installed workflow's folder in Finder.
-    '/' reveals the root of Alfred 2's workflow folders.
+    '/' reveals the root of Alfred's workflow folders.
 
   $kTHIS_NAME cd [-P]         [wfFolderOrBundleID | '/']
     Changes to an installed workflow's folder in a new Terminal window.
-    '/' changes to the root of Alfred 2's workflow folders.
+    '/' changes to the root of Alfred's workflow folders.
   $kTHIS_NAME edit            [wfFolderOrBundleID]
     Opens a workflow for editing in the Alfred Preferences application.
 
@@ -143,8 +143,10 @@ EOF
     echo "$synopses"
     cat <<EOF
 DESCRIPTION
-  Performs various operations related to Alfred 2 workflows.
+  Performs various operations related to Alfred workflows.
   (To learn about Alfred, go to http://alfredapp.com)
+  Supports Alfred 3 and Alfred 2; if both are installed, pass -2 as the very
+  first argument to target Alfred 2.
 
   To get help for a specific command, use \`$kTHIS_NAME help <command>\`
   or \`$kTHIS_NAME <command> -h\`.
@@ -766,25 +768,25 @@ getSymlinkTo() {
   return 1
 }
 
-# Indicates if the specified folder is an Alfred 2 workflow folder,
+# Indicates if the specified folder is an Alfred workflow folder,
 # i.e., whether it contains a workflow, regardless of its location (i.e., whether a dev or installed folder).
 isWfFolder() {
   local f=${1:-.}
   [[ -f $f/info.plist ]] && fgrep -q 'alfred.workflow.' "$f/info.plist"
 }
 
-# Indicates if the specified folder is an *installed* Alfred 2 workflow folder.
+# Indicates if the specified folder is an *installed* Alfred workflow folder.
 isInstalledWfFolder() {  
   isWfFolder "${1:-.}" && isChild "${1:-.}" "$(getInstalledWfsRootFolder)"
 }
 
-# Indicates if the specified folder is a *dev* Alfred 2 workflow folder, i.e.,
+# Indicates if the specified folder is a *dev* Alfred workflow folder, i.e.,
 # one that is NOT among the installed workflows (though it could be symlinked there).
 isDevWfFolder() {
   isWfFolder "${1:-.}" && ! isChild "${1:-.}" "$(getInstalledWfsRootFolder)"
 }
 
-# Indicates if the specified folder is a *dev* Alfred 2 workflow folder that is *also installed*, i.e.,
+# Indicates if the specified folder is a *dev* Alfred workflow folder that is *also installed*, i.e.,
 # *currently symlinked to from among the installed workflows.*
 isDevWfFolderInstalled() {
   local f=${1:-.}
@@ -792,7 +794,7 @@ isDevWfFolderInstalled() {
   getSymlinkTo "$f" "$(getInstalledWfsRootFolder)" >/dev/null
 }
 
-# Indicates if the specified folder is an *installed* Alfred 2 workflow folder that is 
+# Indicates if the specified folder is an *installed* Alfred workflow folder that is 
 # *symlinked to a dev folder*.
 isInstalledWfFolderSymlinked() {
   local f=${1:-.}
@@ -853,36 +855,36 @@ makeWfArchive() {
   (cd "$sourcePath" && zip -r "$archivePath" . -x "${EXCLUSION_PATTERNS[@]}" >/dev/null) || die
 }
 
-# Get Alfred 2's user preferences folder.
+# Get Alfred's user preferences folder.
 getPrefsFolder() {
   local plist parentFolder folder
-  plist="$HOME/Library/Preferences/com.runningwithcrayons.Alfred-Preferences.plist"
+  plist=$kALFRED_PREFSPLIST_PATH # Note: This path depends on the major Alfred version targeted and is determined on startup. 
   [[ -f $plist ]] || die "Cannot locate Alfred's preferences plist file: $plist"
   # Look for a sync folder first...
   parentFolder=$(/usr/libexec/PlistBuddy -c 'print :syncfolder' "$plist" 2> /dev/null)
   if [[ -n $parentFolder ]]; then
     [[ ${parentFolder:0:1} == '~' ]] && parentFolder="$HOME${parentFolder:1}"
   else # look in default location
-    parentFolder="$HOME/Library/Application Support/Alfred 2"
+    parentFolder=$kALFRED_APPSUPPORTFOLDER_PATH # Note: This path depends on the major Alfred version targeted and is determined on startup.
   fi
   folder="$parentFolder/Alfred.alfredpreferences"
   [[ -d $folder ]] || die "Cannot locate Alfred's user preferences folder: $folder"
   echo "$folder"
 }
 
-# Get the workflows root folder, i.e., the path of the folder in which Alfred 2 stores all installed workflows in subfolders.
-# !! Uses *global* variable $_CACHED_WFS_ROOT_FOLDER to cache the result.
+# Get the workflows root folder, i.e., the path of the folder in which Alfred stores all installed workflows in subfolders.
+# !! Uses *global* variable $kCACHED_WFS_ROOT_FOLDER to cache the result.
 getInstalledWfsRootFolder() {
-  # Exception for testing.
-  [[ -n $AWF_TEST_WFSROOTFOLDER ]] && _CACHED_WFS_ROOT_FOLDER=$AWF_TEST_WFSROOTFOLDER
-  if [[ -z $_CACHED_WFS_ROOT_FOLDER ]]; then
-    _CACHED_WFS_ROOT_FOLDER="$(getPrefsFolder)/workflows"
-    [[ -d $_CACHED_WFS_ROOT_FOLDER ]] || die "Cannot locate Alfred's workflows folder: $_CACHED_WFS_ROOT_FOLDER"
+  # Exception for testing, via env. variable AWF_TEST_WFSROOTFOLDER
+  [[ -n $AWF_TEST_WFSROOTFOLDER ]] && kCACHED_WFS_ROOT_FOLDER=$AWF_TEST_WFSROOTFOLDER
+  if [[ -z $kCACHED_WFS_ROOT_FOLDER ]]; then
+    kCACHED_WFS_ROOT_FOLDER="$(getPrefsFolder)/workflows"
+    [[ -d $kCACHED_WFS_ROOT_FOLDER ]] || die "Cannot locate Alfred's workflows folder: $kCACHED_WFS_ROOT_FOLDER"
   fi
-  echo "$_CACHED_WFS_ROOT_FOLDER"
+  echo "$kCACHED_WFS_ROOT_FOLDER"
 }
 
-# Returns the full path of the Alfred 2 workflow folder hosting the workflow with the specified bundle ID.
+# Returns the full path of the Alfred workflow folder hosting the workflow with the specified bundle ID.
 # If there is no such workflow, the exit code is set to 1 and nothing is output.
 getInstalledWfFolderByBundleId() {
   local bundleId=$1 wfRootFolder
@@ -1202,7 +1204,7 @@ searchForWfsInAlfredPrefs() {
           end repeat          
           tell front window
             perform action "AXRaise" # !! This is crucial, as - due to a bug - the window ends up inactive when `activate application "Alfred Preferences"` is run while the app is not running.
-            click (first button of first toolbar whose name is "Workflows") # !! as of Alfred 2.5: while the click is effective, the toolbar button is not highlighted as focused if the window was already open with a different tab selected  - seems to be a bug.
+            click (first button of first toolbar whose name is "Workflows") # !! as of Alfred v2.5: while the click is effective, the toolbar button is not highlighted as focused if the window was already open with a different tab selected  - seems to be a bug.
           end tell
           # Assign filter (search) term or, if not specified, "" to clear the search field.
           tell (first text field of front window whose role description is "search text field")
@@ -1224,7 +1226,7 @@ searchForWfsInAlfredPrefs() {
     # NOTE: Alfred Preferences is assumed to be frontmost.
     # If a scope filter is found to be in effect:
     #     !! Must use GUI scripting for technical reasons. 
-    #     !! Visually disruptive, and, as of Alfred 2.5.1, involves a multi-second delay.
+    #     !! Visually disruptive, and, as of Alfred v2.5.1, involves a multi-second delay.
     on resetWfSearch()
       local btn, searchField, isFiltered
       tell application "System Events"
@@ -1246,9 +1248,9 @@ searchForWfsInAlfredPrefs() {
               tell btn
                 try
                   if value of attribute "AXDescription" = "action" then
-                    # !! Sadly, as of Alfred 2.5.1 (seen on 10.9 and 10.10), this statement causes a MULTI-SECOND DELAY.
+                    # !! Sadly, as of Alfred v2.5.1 (seen on 10.9 and 10.10), this statement causes a MULTI-SECOND DELAY.
                     click
-                    # !! Sadly, as of Alfred 2.5.1 (seen on 10.9 and 10.10), the menu child UI element never becomes accessible, so our only option
+                    # !! Sadly, as of Alfred v2.5.1 (seen on 10.9 and 10.10), the menu child UI element never becomes accessible, so our only option
                     # !! is to send keystrokes, if targeting the menu fails.
                     try # try invoking the menu command
                       click (first menu item of menu 1 whose value of attribute "AXTitle" is "Reset Search") # click menu item that resets the search
@@ -2328,13 +2330,41 @@ changeToWfFolderInNewTerminalTab() {
     wfFolder=$(cd -- "$wfFolder" && pwd -P) || die
   fi
 
-  # Use AppleScript to open a new Terminal.app window.
-  # Note: we assume that $wfFolder contains neither " nor \ instances, so no escaping is applied.
-  osascript <<EOF  >/dev/null
-    tell application "Terminal"
-      do script "cd " & quoted form of "$wfFolder"
-    end tell
+  # Use AppleScript to open a new terminal window in which the `cd` command is performed.
+  # We use a new *window* both to avoid the inability to directly script creation of a new tab in 
+  # Terminal.app and to make it more obvious what happens.
+  # (The following `echo` would be suitable for a verbose mode, but by default we don't want to pollute stdout: echo "Opening a new terminal window with working directory '$wfFolder'.")
+  if [[ $TERM_PROGRAM == 'iTerm.app' ]]; then # iTerm2
+
+    case $(osascript -e 'version of application "iTerm.app"') in
+      1.*|2.*) # v1, v2: old AppleScript syntx.
+        osascript <<EOF  >/dev/null
+          tell application "iTerm.app"
+            tell application "iTerm" to launch (make new terminal) session ""
+            write (current session of current terminal) text "cd " & quoted form of "$wfFolder"
+          end tell
 EOF
+        ;;
+      *) # v3+ - new AppleScript syntax.        
+        osascript <<EOF  >/dev/null
+          tell application "iTerm.app"
+            create window with default profile
+            tell current session of current window to write text "cd " & quoted form of "$wfFolder" 
+          end tell
+EOF
+        ;;
+    esac
+    
+  else # Terminal.app 
+
+    osascript <<EOF  >/dev/null
+      tell application "Terminal"
+        do script "cd " & quoted form of "$wfFolder"
+        activate
+      end tell
+EOF
+
+  fi
 
 }
 
@@ -2799,8 +2829,38 @@ wfVersion() {
 
 # --- END: Sub-command-implementing functions
 
+# MAIN BODY
 
-# Store the command name and exit, if none specified.
+# The major Alfred versions this utility supports.
+# List entries as <majorVer>=<prefsPlistPath>:<appSupportFolder>, *highest version first*.
+kVERSIONSPECS_ALFRED_SUPPORTED=( 
+  "3=$HOME/Library/Preferences/com.runningwithcrayons.Alfred-Preferences-3.plist:$HOME/Library/Application Support/Alfred 3"
+  "2=$HOME/Library/Preferences/com.runningwithcrayons.Alfred-Preferences.plist:$HOME/Library/Application Support/Alfred 2"
+)
+# Array derived from the array above, containing the major version numbers only.
+kVERSIONS_MAJOR_ALFRED_SUPPORTED="${kVERSIONSPECS_ALFRED_SUPPORTED[@]%%=*}"
+# Regex that parses a version spec above into its constitutent components.
+kREGEX_PARSE_VERSIONSPEC='^([0-9]+)=(.+):(.+)$'
+
+# Determine the major Alfred version to target (either implicitly, or explicitly specified).
+
+# -<n> as the very 1st argument specifies the target major version.
+kTARGET_VERSION_MAJOR_ALFRED= targetMajorVersion=
+[[ $1 =~ ^-[0-9]+$ ]] && { targetMajorVersion=${1#-}; shift; }
+
+for vSpec in "${kVERSIONSPECS_ALFRED_SUPPORTED[@]}"; do
+  [[ $vSpec =~ $kREGEX_PARSE_VERSIONSPEC ]]
+  majorVer="${BASH_REMATCH[1]}" kALFRED_PREFSPLIST_PATH="${BASH_REMATCH[2]}" kALFRED_APPSUPPORTFOLDER_PATH="${BASH_REMATCH[3]}"
+  if [[ -n $targetMajorVersion ]]; then # Explicit target version specified: see if we support it.
+    [[ "$targetMajorVersion" == "$majorVer" ]]
+  else # By default, we target the highest version (we know of) that is installed.
+    [[ -f $kALFRED_PREFSPLIST_PATH ]] 
+  fi
+  (( $? == 0 )) && { kTARGET_VERSION_MAJOR_ALFRED="$majorVer"; break; }
+done
+[[ -n $kTARGET_VERSION_MAJOR_ALFRED ]] || die "$( [[ -n targetMajorVersion ]] && printf "Unsupported Alfred version specified: $targetMajorVersion" || printf "No (supported) version of Alfred found" ); supported versions are: $(echo "${kVERSIONS_MAJOR_ALFRED_SUPPORTED[@]}" | sed 's/ /, /g')"
+
+# Store the command name; exit, if none was specified.
 cmd=$1; shift
 [[ -n $cmd ]] || dieSyntax "Missing sub-command."
 
