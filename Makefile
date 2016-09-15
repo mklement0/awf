@@ -269,7 +269,7 @@ update-license-year:
 #    To change this, modify CLI_HELP_CMD in the shell command below.
 .PHONY: _update-readme-usage
 # The arguments to pass to the CLI to have it output its help.
-CLI_HELP_ARGS:= --help
+CLI_HELP_ARGS:= help all 	# !! Note that this value is SPECIFIC TO THIS PROJECT and MUST BE RESTORED AFTER UPDATING THIS MAKEFILE from the generic version maintained as part of `make-pkg`; typically, it's just `--help` 
 # Note that the recipe exits right away if no CLIs are found in 'package.json'.
 # TO DISABLE THIS RULE, REMOVE ALL OF ITS RECIPE LINES.
 _update-readme-usage:
