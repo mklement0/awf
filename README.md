@@ -11,7 +11,7 @@
 
 **Contents**
 
-- [awf &mdash; a CLI for managing Alfred workflows](#awf-&mdash-a-cli-for-managing-alfred-workflows)
+- [awf &mdash; a CLI for managing Alfred workflows](#awf--a-cli-for-managing-alfred-workflows)
     - [Retrieving information about workflows](#retrieving-information-about-workflows)
     - [Locating workflows](#locating-workflows)
     - [Editing workflows](#editing-workflows)
