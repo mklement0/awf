@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+
+# ---
+# IMPORTANT: Use the following statement at the TOP OF EVERY TEST SCRIPT
+#            to ensure that this package's 'bin/' subfolder is added to the path so that
+#            this package's CLIs can be invoked by their mere filename in the rest
+#            of the script.
+# ---
+PATH=${PWD%%/test*}/bin:$PATH
+
+# Execute your tests as shell commands below. 
+# An exit code of zero signals success, any other code signals an error
+# and causes this test to fail.
+# See https://github.com/tlevine/urchin.
+
+# Helper function for error reporting.
+die() { (( $# > 0 )) && echo "ERROR: $*" >&2; exit 1; }
+
+dieUnexpected() {
+  cat <<EOF >&2
+ERROR: Unexpected output from \`${cmd[@]}\`:
+  Expected:
+$expectedOutput
+  Actual:
+$output
+  Diff:
+EOF
+  diff <(printf '%s\n' "$expectedOutput") <(printf '%s\n' "$output")
+  exit 1
+}
+
+# Point awf to the test workflows folder.
+export AWF_TEST_WFSROOTFOLDER='../.fixtures/workflows'
+
+# ----
+echo "Default info output, with header, space-separated, aligned..."
+
+cmd=( awf info 'net.same2u.stringlength.awf' )
+output=$( "${cmd[@]}" )
+expectedOutput=$( cat <<EOF 
+installpath:  ../.fixtures/workflows/user.workflow.BCCAF73E-EF0D-411E-A304-5A928C43C2BF
+devpath:      
+disabled:     false
+bundleid:     net.same2u.stringlength.awf
+name:         String (Text) Length
+description:  Calculates the length of the specified string (text) in both characters and bytes.
+category:     Productivity
+createdby:    Michael Klement
+webaddress:   http://same2u.net
+readme:       
+EOF
+)
+[[ "$output" == "$expectedOutput" ]] || dieUnexpected
+
+# ----
+echo "Bare output (no field names)..."
+
+cmd=( awf info -b 'net.same2u.stringlength.awf' )
+output=$( "${cmd[@]}" )
+expectedOutput=$( cat <<EOF 
+../.fixtures/workflows/user.workflow.BCCAF73E-EF0D-411E-A304-5A928C43C2BF
+
+false
+net.same2u.stringlength.awf
+String (Text) Length
+Calculates the length of the specified string (text) in both characters and bytes.
+Productivity
+Michael Klement
+http://same2u.net
+
+EOF
+)
+[[ "$output" == "$expectedOutput" ]] || dieUnexpected
+
+# ----
+echo "Explicitly selected output fields: all..."
+
+cmd=( awf info -b -o plaindcbwr 'net.same2u.stringlength.awf' )
+output=$( "${cmd[@]}" )
+expectedOutput=$( cat <<EOF 
+../.fixtures/workflows/user.workflow.BCCAF73E-EF0D-411E-A304-5A928C43C2BF
+
+false
+net.same2u.stringlength.awf
+String (Text) Length
+Calculates the length of the specified string (text) in both characters and bytes.
+Productivity
+Michael Klement
+http://same2u.net
+
+EOF
+)
+[[ "$output" == "$expectedOutput" ]] || dieUnexpected
+
+# ----
+echo "Explicitly selected output fields: subset..."
+
+cmd=( awf info -o awp 'net.same2u.stringlength.awf' )
+output=$( "${cmd[@]}" )
+expectedOutput=$( cat <<EOF 
+disabled:     false
+webaddress:   http://same2u.net
+installpath:  ../.fixtures/workflows/user.workflow.BCCAF73E-EF0D-411E-A304-5A928C43C2BF
+EOF
+)
+[[ "$output" == "$expectedOutput" ]] || dieUnexpected
+

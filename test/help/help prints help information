@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+
+# ---
+# IMPORTANT: Use the following statement at the TOP OF EVERY TEST SCRIPT
+#            to ensure that this package's 'bin/' subfolder is added to the path so that
+#            this package's CLIs can be invoked by their mere filename in the rest
+#            of the script.
+# ---
+PATH=${PWD%%/test*}/bin:$PATH
+
+# Helper function for error reporting.
+die() { (( $# > 0 )) && echo "ERROR: $*" >&2; exit 1; }
+
+dieUnexpected() {
+  die "\`${cmd[@]}\` failed unexpectedly."
+}
+
+
+# ----
+
+cmd=( awf '-h' )
+output=$( "${cmd[@]}" ) || dieUnexpected
+expectedOutputSubstring='awf help'
+grep -Fq "$expectedOutputSubstring" <<<"$output" || die "Expected '$expectedOutputSubstring' in output from \`${cmd[@]}\`; not found in output: $output"
+
+cmd=( awf help )
+output=$( "${cmd[@]}" ) || dieUnexpected
+expectedOutputSubstring='awf help'
+grep -Fq "$expectedOutputSubstring" <<<"$output" || die "Expected '$expectedOutputSubstring' in output from \`${cmd[@]}\`; not found in output: $output"
+
+cmd=( awf help all )
+output=$( "${cmd[@]}" ) || dieUnexpected
+expectedOutputSubstring='awf help'
+grep -Fq "$expectedOutputSubstring" <<<"$output" || die "Expected '$expectedOutputSubstring' in output from \`${cmd[@]}\`; not found in output: $output"
+descrCount=$(grep -F 'DESCRIPTION' <<<"$output" | wc -l)
+(( descrCount > 1 )) || die "Expected multiple 'DESCRIPTION' headers; not found in output: $output"
+
+cmd=( awf help info )
+output=$( "${cmd[@]}" ) || dieUnexpected
+expectedOutputSubstring='awf info '
+grep -Fq "$expectedOutputSubstring" <<<"$output" || die "Expected '$expectedOutputSubstring' in output from \`${cmd[@]}\`; not found in output: $output"
+
+cmd=( awf help no-such-subcommand )
+output=$( "${cmd[@]}" 2>/dev/null ) && die "\`${cmd[@]}\` succeeded unexpectedly."
+
+exit 0

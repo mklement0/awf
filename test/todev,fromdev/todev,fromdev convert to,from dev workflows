@@ -1,0 +1,118 @@
+#!/usr/bin/env bash
+
+# ---
+# IMPORTANT: Use the following statement at the TOP OF EVERY TEST SCRIPT
+#            to ensure that this package's 'bin/' subfolder is added to the path so that
+#            this package's CLIs can be invoked by their mere filename in the rest
+#            of the script.
+# ---
+PATH=${PWD%%/test*}/bin:$PATH
+
+# Helper function for error reporting.
+die() { (( $# > 0 )) && echo "ERROR: $*" >&2; exit 1; }
+
+dieUnexpected() {
+  die "\`${cmd[@]}\` failed unexpectedly."
+}
+
+dieUnexpectedOutput() {
+  cat <<EOF >&2
+ERROR: Unexpected output from \`${cmd[@]}\`:
+  Expected:
+$expectedOutput
+  Actual:
+$output
+  Diff:
+EOF
+  diff <(printf '%s\n' "$expectedOutput") <(printf '%s\n' "$output")
+  exit 1
+}
+
+# Point awf to the test workflows folder created in ../setup_dir
+kTEMP_DIR_PATH="$(< '../_tmp_tmpdirpath')"
+export AWF_TEST_WFSROOTFOLDER="$kTEMP_DIR_PATH/workflows"
+
+[[ -d $kTEMP_DIR_PATH ]] || die "Test setup failure: Temp. folder created by ../setup_dir unexpectedly not found: $kTEMP_DIR_PATH"
+
+# --
+echo "-- Moving installed workflow to dev location..."
+
+# Get the folder path of an installed workflow.
+bundleid='net.same2u.stringlength.awf'
+cmd=( awf which "$bundleid" )
+wfFolder=$( "${cmd[@]}" ) || dieUnexpected
+
+# -- Clone that workflow, so we can apply `todev` and `fromdev` to it
+wfFolderClone="${wfFolder}.clone"
+bundleidClone="${bundleid}.clone"
+rm -rf "$wfFolderClone"
+cp -a "$wfFolder" "$wfFolderClone" || die "Failed to clone folder '$wfFolder' to '$wfFolderClone'"
+# Assign a unique bundle ID.
+/usr/libexec/PlistBuddy -c "set :bundleid ${bundleidClone}" "$wfFolderClone/info.plist" || die "Failed to update the bundle ID in: $wfFolderClone/info.plist" 
+devWfFolderName='StringLengthClone.awf'
+devWfFolder="$kTEMP_DIR_PATH/dev/$devWfFolderName"
+rm -rf "$devWfFolder"
+# The full path of the symlink that will be created when applying `awf todev` below.
+wfSymlinkToDevFolder="${kTEMP_DIR_PATH}/workflows/dev.workflow.${devWfFolderName}"
+rm -f "$wfSymlinkToDevFolder"
+
+# --
+echo "-- Converting installed workflow to dev workflow..."
+cmd=( awf todev "$wfFolderClone" "$devWfFolder" )
+"${cmd[@]}" || die "Failed to convert workflow '$wfFolderClone' to a dev workflow in '$devWfFolder'"
+wfSymlinkToDevFolder="${AWF_TEST_WFSROOTFOLDER}/dev.workflow.${devWfFolderName}"
+
+linkTarget=$(readlink "$wfSymlinkToDevFolder") || dieUnexpected
+
+[[ "$linkTarget" == "$devWfFolder" ]] || die "Expected symlink '$wfSymlinkToDevFolder' to point to '$devWfFolder', but it points to '$linkTarget'"
+
+
+# --
+echo "-- Converting dev workflow back to installed workflow..."
+
+cmd=( awf fromdev "$devWfFolder" )
+"${cmd[@]}" || dieUnexpected
+
+[[ ! -d "$devWfFolder" ]] || die "Dev folder '$devWfFolder' unexpectedly still exists."
+
+
+# --
+echo "-- Copying dev workflow to installed workflow while retaining the dev workflow..."
+
+# Get the current folder path of the moved-back-to-installed-workflows workflow.
+cmd=( awf which "$bundleidClone" )
+wfFolderClone=$( "${cmd[@]}" ) || dieUnexpected
+
+# Move it back to a dev workflow again.
+cmd=( awf todev "$wfFolderClone" "$devWfFolder" )
+"${cmd[@]}" || dieUnexpected
+
+# Now *copy* it to the installed workflows, keeping the dev folder as a *detached copy*.
+cmd=( awf fromdev -k "$devWfFolder" )
+"${cmd[@]}" || dieUnexpected
+
+[[ -d "$devWfFolder" ]] || die "Dev folder '$devWfFolder' unexpectedly no longer exists."
+
+# Get the current folder path of the copied-to-installed-workflows workflow.
+cmd=( awf which "$bundleidClone" )
+wfFolderClone=$( "${cmd[@]}" ) || dieUnexpected
+
+# Make sure that the original dev workflow and its new copy among the installed workflows match.
+diff -r -x '.DS_Store' "$devWfFolder" "$wfFolderClone" || die "Folder contents unexpectedly do not match: '$devWfFolder' vs. '$wfFolderClone'"
+
+# ------- NEGATIVE tests
+
+# --
+echo "-- Trying todev to a nonempty folder should fail..."
+cmd=( awf todev "$wfFolderClone" "$devWfFolder" )
+"${cmd[@]}" 2>/dev/null && die "\`${cmd[@]}\` succeeded unexpectedly despite nonempty target folder."
+
+# --
+echo "-- Trying fromdev when a target workflow with the same bundle ID already exists should fail..."
+cmd=( awf fromdev "$devWfFolder" )
+"${cmd[@]}" 2>/dev/null && die "\`${cmd[@]}\` succeeded unexpectedly despite bundle ID already existing among installed workflows."
+
+rm -rf "$devWfFolder"
+rm -rf "$wfFolderClone"
+
+exit 0

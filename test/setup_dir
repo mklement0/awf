@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+
+# Helper function for error reporting.
+die() { (( $# > 0 )) && echo "ERROR: $*" >&2; exit 1; }
+
+# Create a temp. DIR
+tmpDir=$(mktemp -d -t XXXX) || die # Works on both OSX and Linux; note: dir. name will have random extension on OSX (e.g., '.../XXXX.bJViLcM3') and none on Linux (e.g., '.../vXDA')
+
+# Copy the test workflows to ./workflows...
+cp -a ./.fixtures/workflows "$tmpDir/" || die
+# and create the parent dir for the dev workflows.
+mkdir "$tmpDir/dev" || die
+
+# Save path of temp. dir so that `teardown` knows what to remove.
+kTEMP_DIR_PATH_FILE='_tmp_tmpdirpath'
+echo "$tmpDir" > "$kTEMP_DIR_PATH_FILE"

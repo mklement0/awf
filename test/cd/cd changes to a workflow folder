@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+
+# ---
+# IMPORTANT: Use the following statement at the TOP OF EVERY TEST SCRIPT
+#            to ensure that this package's 'bin/' subfolder is added to the path so that
+#            this package's CLIs can be invoked by their mere filename in the rest
+#            of the script.
+# ---
+PATH=${PWD%%/test*}/bin:$PATH
+
+# Execute your tests as shell commands below. 
+# An exit code of zero signals success, any other code signals an error
+# and causes this test to fail.
+# See https://github.com/tlevine/urchin.
+
+# Helper function for error reporting.
+die() { (( $# > 0 )) && echo "ERROR: $*" >&2; exit 1; }
+
+getTerminalWinCount() {
+  osascript -e 'tell application "Terminal" to count of windows'
+}
+
+# getFrontTerminalWindowPwd() {
+#   osascript <<EOF
+# tell application "Terminal" to set ttab to do script "clear; pwd" in front window
+# delay 1
+# contents of contents of ttab
+# EOF
+
+getFrontTerminalWindowPwd() {
+  # Create a temp. FILE
+  local tmpFile=$(mktemp -t 'XXXX') # Works on both OSX and Linux; note: file will have random extension on OSX (e.g., '.../XXXX.bJViLcM3') and none on Linux (e.g., '.../vXDA')
+
+  # Send `pwd` with redirection to a temp. file to the front Terminal windows.
+  # This is the most robust way to determine the working dir.
+  osascript <<EOF >/dev/null
+tell application "Terminal" to set ttab to do script "pwd >'${tmpFile}'" in front window
+EOF
+  # !! We need to wait for the file to have content
+  local timeout=5 i=0
+  while [[ ! -s $tmpFile ]]; do
+    delay 1
+    if (( ++i >= timeout )); then
+      echo "TIMED OUT while waiting for cwd to be written to '$tmpFile'." >&2
+      return 1
+    fi
+  done
+  cat "$tmpFile"; rm "$tmpFile"  
+}
+
+closeFrontTerminalWindow() {
+  osascript -e 'tell application "Terminal" to close front window'
+}
+
+# ---------
+
+# Point awf to the test workflows folder.
+kTEMP_DIR_PATH="$(< '../_tmp_tmpdirpath')"
+export AWF_TEST_WFSROOTFOLDER="$kTEMP_DIR_PATH/workflows"
+
+[[ -d $kTEMP_DIR_PATH ]] || die "Test setup failure: Temp. folder created by ../setup_dir unexpectedly not found: $kTEMP_DIR_PATH"
+
+
+# ----
+echo "Changing to parent folder of all installed workflows..."
+
+winCountBefore=$(getTerminalWinCount)
+
+cmd=( awf cd '/' )
+"${cmd[@]}" || "Failed unexpectedly: \`${cmd[@]}\`"
+
+winCountAfter=$(getTerminalWinCount)
+
+(( winCountAfter > winCountBefore )) || die "No new Terminal window was created."
+
+# Obtain the new Terminal window's current dir.
+cwd=$(getFrontTerminalWindowPwd) || die "Failed to get cwd from front terminal window"
+
+closeFrontTerminalWindow
+
+[[ "$AWF_TEST_WFSROOTFOLDER" == "$cwd" ]] || die "Expected working dir '$AWF_TEST_WFSROOTFOLDER', got '$cwd'"
+
+
+bundleid='net.same2u.stringlength.awf'
+wfInstallPath=$(awf which "$bundleid") || die "Failed to determine workflow folder for bundle ID $bundleid"
+
+# ----
+echo "Changing to specific workflow folder by bundle ID..."
+
+winCountBefore=$(getTerminalWinCount)
+
+cmd=( awf cd "$bundleid" )
+"${cmd[@]}" || "Failed unexpectedly: \`${cmd[@]}\`"
+
+winCountAfter=$(getTerminalWinCount)
+
+(( winCountAfter > winCountBefore )) || die "No new Terminal window was created."
+
+# Obtain the new Terminal window's current dir.
+cwd=$(getFrontTerminalWindowPwd) || die "Failed to get cwd from front terminal window"
+
+closeFrontTerminalWindow
+
+[[ "$wfInstallPath" == "$cwd" ]] || die "Expected working dir '$wfInstallPath', got '$cwd'"
+
+# Note: We don't bother testing -P (resolution of the symlink to the underlying dev folder),
+#       because an equivalent test is performed for `awf which -P`, which uses the same
+#       underlying functionality to resolve the path.

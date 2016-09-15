@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+# ---
+# IMPORTANT: Use the following statement at the TOP OF EVERY TEST SCRIPT
+#            to ensure that this package's 'bin/' subfolder is added to the path so that
+#            this package's CLIs can be invoked by their mere filename in the rest
+#            of the script.
+# ---
+PATH=${PWD%%/test*}/bin:$PATH
+
+# Execute your tests as shell commands below. 
+# An exit code of zero signals success, any other code signals an error
+# and causes this test to fail.
+# See https://github.com/tlevine/urchin.
+
+# Helper function for error reporting.
+die() { (( $# > 0 )) && echo "ERROR: $*" >&2; exit 1; }
+
+# Point awf to the test workflows folder created by ../setup_dir
+kTEMP_DIR_PATH="$(< '../_tmp_tmpdirpath')"
+export AWF_TEST_WFSROOTFOLDER="$kTEMP_DIR_PATH/workflows"
+
+[[ -d $kTEMP_DIR_PATH ]] || die "Test setup failure: Temp. folder created by ../setup_dir unexpectedly not found: $kTEMP_DIR_PATH"
+
+awf prune || die "Pruning dead symlinks failed unexpectedly."
+
+for f in "$AWF_TEST_WFSROOTFOLDER"/*; do
+  [[ -L "$f" && ! -e "$f" ]] && die "Unexpectedly still found dead symlink: $f"
+done
+
+exit 0

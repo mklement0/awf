@@ -1,0 +1,457 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>bundleid</key>
+	<string>org.example.dummy</string>
+	<key>connections</key>
+	<dict>
+		<key>4D64CCEA-10D0-4F18-8F5D-26279711F09B</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>D894EA1F-6CFF-4AF4-8C64-0414811AE1FC</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+			</dict>
+		</array>
+		<key>C6E6DC1D-3EFF-4B22-A3AB-BD93D535D60A</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>43FF8F78-35F4-4AD8-BD81-ABF512587346</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+			</dict>
+		</array>
+		<key>CC99EC1F-114D-47C9-9044-736246D3681D</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>CFCD73E4-43F8-4182-87DD-251B8BA1CA8E</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+			</dict>
+		</array>
+		<key>CD22ED0E-FF74-4BB6-A44E-28703CFA04E0</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>C6E6DC1D-3EFF-4B22-A3AB-BD93D535D60A</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+			</dict>
+		</array>
+		<key>CFCD73E4-43F8-4182-87DD-251B8BA1CA8E</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>D2C70E23-ACEE-4629-9D26-1EEF0548A5B7</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+			</dict>
+		</array>
+		<key>D894EA1F-6CFF-4AF4-8C64-0414811AE1FC</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>1E65DB6D-9859-49EB-BE56-0932891FE094</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+			</dict>
+		</array>
+		<key>F21431F1-2731-4CC0-9EA3-31D3A80B74CE</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>1E65DB6D-9859-49EB-BE56-0932891FE094</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+			</dict>
+		</array>
+	</dict>
+	<key>createdby</key>
+	<string>Michael Klement &lt;mklement0@gmail.com&gt;</string>
+	<key>description</key>
+	<string>For playing with workflow definitions</string>
+	<key>disabled</key>
+	<false/>
+	<key>name</key>
+	<string>Playground</string>
+	<key>objects</key>
+	<array>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>action</key>
+				<integer>0</integer>
+				<key>argument</key>
+				<integer>0</integer>
+				<key>hotkey</key>
+				<integer>80</integer>
+				<key>hotmod</key>
+				<integer>8650752</integer>
+				<key>hotstring</key>
+				<string>F19</string>
+				<key>leftcursor</key>
+				<false/>
+				<key>modsmode</key>
+				<integer>0</integer>
+				<key>relatedAppsMode</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.hotkey</string>
+			<key>uid</key>
+			<string>CD22ED0E-FF74-4BB6-A44E-28703CFA04E0</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
+				<string># display alert "in"
+
+tell application "System Events"
+	tell front window of process "Alfred Preferences"
+		tell button 8
+		click # first menu item of menu 1 whose value of attribute "AXTitle"
+	end tell
+	end tell
+end tell
+</string>
+				<key>type</key>
+				<integer>6</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>C6E6DC1D-3EFF-4B22-A3AB-BD93D535D60A</string>
+			<key>version</key>
+			<integer>0</integer>
+		</dict>
+		<dict>
+			<key>type</key>
+			<string>alfred.workflow.output.largetype</string>
+			<key>uid</key>
+			<string>D2C70E23-ACEE-4629-9D26-1EEF0548A5B7</string>
+			<key>version</key>
+			<integer>0</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
+				<string>query="{query}"
+
+var app = Application.currentApplication(); app.includeStandardAdditions = true
+
+app.systemAttribute('HOME')
+</string>
+				<key>type</key>
+				<integer>7</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>CFCD73E4-43F8-4182-87DD-251B8BA1CA8E</string>
+			<key>version</key>
+			<integer>0</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>pg</string>
+				<key>text</key>
+				<string>Playground - test workflow</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>CC99EC1F-114D-47C9-9044-736246D3681D</string>
+			<key>version</key>
+			<integer>0</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>lastpathcomponent</key>
+				<false/>
+				<key>onlyshowifquerypopulated</key>
+				<true/>
+				<key>output</key>
+				<integer>0</integer>
+				<key>removeextension</key>
+				<false/>
+				<key>sticky</key>
+				<false/>
+				<key>text</key>
+				<string>{query}</string>
+				<key>title</key>
+				<string>Sandbox</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.notification</string>
+			<key>uid</key>
+			<string>43FF8F78-35F4-4AD8-BD81-ABF512587346</string>
+			<key>version</key>
+			<integer>0</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>action</key>
+				<integer>0</integer>
+				<key>argument</key>
+				<integer>0</integer>
+				<key>hotkey</key>
+				<integer>0</integer>
+				<key>hotmod</key>
+				<integer>0</integer>
+				<key>hotstring</key>
+				<string></string>
+				<key>leftcursor</key>
+				<false/>
+				<key>modsmode</key>
+				<integer>0</integer>
+				<key>relatedAppsMode</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.hotkey</string>
+			<key>uid</key>
+			<string>4D64CCEA-10D0-4F18-8F5D-26279711F09B</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>127</integer>
+				<key>script</key>
+				<string>~/MkUtil/openwin -p -v Terminal 'VMware'</string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>B50E0A10-9367-45EC-A379-F83C9493C7D5</string>
+			<key>version</key>
+			<integer>0</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>1</integer>
+				<key>escaping</key>
+				<integer>127</integer>
+				<key>keyword</key>
+				<string>playground</string>
+				<key>queuedelaycustom</key>
+				<integer>1</integer>
+				<key>queuedelayimmediatelyinitially</key>
+				<false/>
+				<key>queuedelaymode</key>
+				<integer>0</integer>
+				<key>queuemode</key>
+				<integer>1</integer>
+				<key>script</key>
+				<string>val="You &amp; I &gt; 5'" # string containing chars. reserved in XML
+
+cat &lt;&lt;EOF
+&lt;?xml version="1.0"?&gt;
+&lt;items&gt;
+
+  &lt;item&gt;
+    &lt;title&gt;Arg-as-element demo&lt;/title&gt;
+    &lt;subtitle&gt;On actioning, an alert containing chars. reserved in XML should show&lt;/subtitle&gt;
+	&lt;arg&gt;&lt;![CDATA[$val]]&gt;&lt;/arg&gt;
+  &lt;/item&gt;
+&lt;/items&gt;
+EOF
+</string>
+				<key>title</key>
+				<string>Playground  filter</string>
+				<key>type</key>
+				<integer>0</integer>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.scriptfilter</string>
+			<key>uid</key>
+			<string>F21431F1-2731-4CC0-9EA3-31D3A80B74CE</string>
+			<key>version</key>
+			<integer>0</integer>
+		</dict>
+		<dict>
+			<key>type</key>
+			<string>alfred.workflow.output.largetype</string>
+			<key>uid</key>
+			<string>1E65DB6D-9859-49EB-BE56-0932891FE094</string>
+			<key>version</key>
+			<integer>0</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>applescript</key>
+				<string>on alfred_script(q)
+  -- your script here
+end alfred_script</string>
+				<key>cachescript</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.applescript</string>
+			<key>uid</key>
+			<string>82F3524B-C8DC-4FF5-A48B-4F50A3EB8024</string>
+			<key>version</key>
+			<integer>0</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>1</integer>
+				<key>escaping</key>
+				<integer>127</integer>
+				<key>queuedelaycustom</key>
+				<integer>1</integer>
+				<key>queuedelayimmediatelyinitially</key>
+				<false/>
+				<key>queuedelaymode</key>
+				<integer>0</integer>
+				<key>queuemode</key>
+				<integer>1</integer>
+				<key>script</key>
+				<string>"&lt;?xml version='1.0'?&gt;
+&lt;items&gt;
+
+&lt;item arg='(none)'&gt;
+  &lt;title&gt;Live-searching Evernote - see its window.&lt;/title&gt;
+  &lt;subtitle&gt;Title-word prefix matching by default; append \"=\" for exact match; prefix or suffix words with \"/\" for global search.&lt;/subtitle&gt;
+  &lt;icon&gt;icon.png&lt;/icon&gt;
+&lt;/item&gt;
+
+&lt;/items&gt;
+"
+</string>
+				<key>title</key>
+				<string>pg</string>
+				<key>type</key>
+				<integer>6</integer>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.scriptfilter</string>
+			<key>uid</key>
+			<string>D894EA1F-6CFF-4AF4-8C64-0414811AE1FC</string>
+			<key>version</key>
+			<integer>0</integer>
+		</dict>
+	</array>
+	<key>readme</key>
+	<string>Read-me line 1.
+Read-me line 2.</string>
+	<key>uidata</key>
+	<dict>
+		<key>1E65DB6D-9859-49EB-BE56-0932891FE094</key>
+		<dict>
+			<key>ypos</key>
+			<real>690</real>
+		</dict>
+		<key>43FF8F78-35F4-4AD8-BD81-ABF512587346</key>
+		<dict>
+			<key>ypos</key>
+			<real>450</real>
+		</dict>
+		<key>4D64CCEA-10D0-4F18-8F5D-26279711F09B</key>
+		<dict>
+			<key>ypos</key>
+			<real>580</real>
+		</dict>
+		<key>82F3524B-C8DC-4FF5-A48B-4F50A3EB8024</key>
+		<dict>
+			<key>ypos</key>
+			<real>700</real>
+		</dict>
+		<key>B50E0A10-9367-45EC-A379-F83C9493C7D5</key>
+		<dict>
+			<key>ypos</key>
+			<real>580</real>
+		</dict>
+		<key>C6E6DC1D-3EFF-4B22-A3AB-BD93D535D60A</key>
+		<dict>
+			<key>ypos</key>
+			<real>10</real>
+		</dict>
+		<key>CC99EC1F-114D-47C9-9044-736246D3681D</key>
+		<dict>
+			<key>ypos</key>
+			<real>430</real>
+		</dict>
+		<key>CD22ED0E-FF74-4BB6-A44E-28703CFA04E0</key>
+		<dict>
+			<key>ypos</key>
+			<real>10</real>
+		</dict>
+		<key>CFCD73E4-43F8-4182-87DD-251B8BA1CA8E</key>
+		<dict>
+			<key>ypos</key>
+			<real>240</real>
+		</dict>
+		<key>D2C70E23-ACEE-4629-9D26-1EEF0548A5B7</key>
+		<dict>
+			<key>ypos</key>
+			<real>240</real>
+		</dict>
+		<key>D894EA1F-6CFF-4AF4-8C64-0414811AE1FC</key>
+		<dict>
+			<key>ypos</key>
+			<real>810</real>
+		</dict>
+		<key>F21431F1-2731-4CC0-9EA3-31D3A80B74CE</key>
+		<dict>
+			<key>ypos</key>
+			<real>690</real>
+		</dict>
+	</dict>
+	<key>webaddress</key>
+	<string>https://github.com/mklement0/pg</string>
+</dict>
+</plist>

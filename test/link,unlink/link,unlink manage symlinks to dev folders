@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+
+# ---
+# IMPORTANT: Use the following statement at the TOP OF EVERY TEST SCRIPT
+#            to ensure that this package's 'bin/' subfolder is added to the path so that
+#            this package's CLIs can be invoked by their mere filename in the rest
+#            of the script.
+# ---
+PATH=${PWD%%/test*}/bin:$PATH
+
+# Execute your tests as shell commands below. 
+# An exit code of zero signals success, any other code signals an error
+# and causes this test to fail.
+# See https://github.com/tlevine/urchin.
+
+# Helper function for error reporting.
+die() { (( $# > 0 )) && echo "ERROR: $*" >&2; exit 1; }
+
+# Point awf to the test workflows folder.
+kTEMP_DIR_PATH="$(< '../_tmp_tmpdirpath')"
+export AWF_TEST_WFSROOTFOLDER="$kTEMP_DIR_PATH/workflows"
+
+[[ -d $kTEMP_DIR_PATH ]] || die "Test setup failure: Temp. folder created by ../setup_dir unexpectedly not found: $kTEMP_DIR_PATH"
+
+
+# -- Clone an existing installed folder into the dev location and modify its bundle ID,
+#    so we can use `awf link` with it.
+bundleid='net.same2u.stringlength.awf'
+wfFolder=$(awf which "$bundleid") || die "Failed to obtain folder path for bundle ID '$bundleid'"
+devWfFolderName='StringLengthClone.awf'
+devWfFolder="$kTEMP_DIR_PATH/dev/$devWfFolderName"
+bundleidClone="${bundleid}.clone"
+rm -rf "$devWfFolder"
+cp -a "$wfFolder" "$devWfFolder" || die "Failed to clone folder '$wfFolder' to '$devWfFolder"
+# Assign a unique bundle ID.
+/usr/libexec/PlistBuddy -c "set :bundleid ${bundleidClone}" "$devWfFolder/info.plist" || die "Failed to update the bundle ID in: $devWfFolder/info.plist" 
+# The full path of the symlink that will be created when applying `awf todev` below.
+wfSymlinkToDevFolder="${AWF_TEST_WFSROOTFOLDER}/dev.workflow.${bundleidClone}"
+rm -f "$wfSymlinkToDevFolder"
+
+# ------
+echo "-- Linking a dev folder..."
+
+awf link "$devWfFolder" || die "Failed to create symlink for dev folder '$devWfFolder'"
+
+linkTarget=$(readlink "$wfSymlinkToDevFolder")
+[[ "$linkTarget" == "$devWfFolder" ]] || die "Symlink doesn't have expected target: got '$linkTarget', expected '$devWfFolder'"
+
+# ------
+echo "-- Re-establishing the very same link (should be successful no-op)..."
+awf link "$devWfFolder" || die "Reestablishing the same symlink should be successful no-op, but failed instead."
+
+# ------
+echo "-- Unlinking..."
+awf unlink "$bundleidClone" || die "Unlinking workflow '$bundleidClone' failed unexpectedly."
+[[ ! -e "$wfSymlinkToDevFolder" ]] || die "Symlink unexpectedly not removed: '$wfSymlinkToDevFolder'"
+
+# ------
+echo "-- Linking with a custom core name..."
+wfCustomSymlinkFolderName='StringLengthCustom'
+wfSymlinkToDevFolder="${AWF_TEST_WFSROOTFOLDER}/dev.workflow.${wfCustomSymlinkFolderName}"
+awf link "$devWfFolder" "$wfCustomSymlinkFolderName" || die "Failed to create symlink for dev folder '$devWfFolder'"
+
+linkTarget=$(readlink "$wfSymlinkToDevFolder")
+[[ "$linkTarget" == "$devWfFolder" ]] || die "Symlink doesn't have expected target: got '$linkTarget', expected '$devWfFolder'"
+
+rm "$wfSymlinkToDevFolder" # clean up
+
+exit 0

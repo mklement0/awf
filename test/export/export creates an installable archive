@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+
+# ---
+# IMPORTANT: Use the following statement at the TOP OF EVERY TEST SCRIPT
+#            to ensure that this package's 'bin/' subfolder is added to the path so that
+#            this package's CLIs can be invoked by their mere filename in the rest
+#            of the script.
+# ---
+PATH=${PWD%%/test*}/bin:$PATH
+
+# Execute your tests as shell commands below. 
+# An exit code of zero signals success, any other code signals an error
+# and causes this test to fail.
+# See https://github.com/tlevine/urchin.
+
+# Helper function for error reporting.
+die() { (( $# > 0 )) && echo "ERROR: $*" >&2; exit 1; }
+
+dieUnexpected() {
+  die "\`${cmd[@]}\` failed unexpectedly."
+}
+
+# -------
+
+# Point awf to the test workflows folder created by ../setup_dir
+kTEMP_DIR_PATH="$(< '../_tmp_tmpdirpath')"
+export AWF_TEST_WFSROOTFOLDER="$kTEMP_DIR_PATH/workflows"
+
+[[ -d $kTEMP_DIR_PATH ]] || die "Test setup failure: Temp. folder created by ../setup_dir unexpectedly not found: $kTEMP_DIR_PATH"
+
+wfFolderName='user.workflow.BD68EAC6-EA5A-479A-93F7-950D539603C2'
+wfFolder="${AWF_TEST_WFSROOTFOLDER}/${wfFolderName}"
+# Get the workflow's bundle ID, because it's used as the archive filename root.
+cmd=( awf id "$wfFolder" )
+bundleid=$( "${cmd[@]}" ) || dieUnexpected
+
+
+# ---
+echo "-- Creating *.alfredworkflow archive in workflow folder..."
+archiveFile="${wfFolder}/${bundleid}.alfredworkflow"
+cmd=( awf export "$wfFolder" )
+"${cmd[@]}" || dieUnexpected
+[[ -f "$archiveFile" ]] || die "Exported *.alfredworkflow archive not found."
+rm "$archiveFile"
+
+# ---
+echo "-- Creating *.alfredworkflow archive in different folder..."
+cmd=( awf export "$wfFolder" "$kTEMP_DIR_PATH" )
+"${cmd[@]}" || dieUnexpected
+archiveFile="${kTEMP_DIR_PATH}/${bundleid}.alfredworkflow"
+[[ -f "$archiveFile" ]] || die "Exported *.alfredworkflow archive not found."
+
+echo "-- Unpacking *.alfredworkflow archive to a temp. folder..."
+outDir="${kTEMP_DIR_PATH}/tmpout"
+cmd=( mkdir -p "$outDir" )
+"${cmd[@]}" || dieUnexpected
+cmd=( unzip -o -d "$outDir" "$archiveFile" )
+"${cmd[@]}" >/dev/null || dieUnexpected
+
+# Compare it to the source.
+cmd=( diff -r -x '.DS_Store' "$outDir" "$wfFolder" )
+"${cmd[@]}" || die "Unpacked *.alfredworkflow doesn't match its source."
+
+exit 0

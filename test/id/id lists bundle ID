@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+
+# ---
+# IMPORTANT: Use the following statement at the TOP OF EVERY TEST SCRIPT
+#            to ensure that this package's 'bin/' subfolder is added to the path so that
+#            this package's CLIs can be invoked by their mere filename in the rest
+#            of the script.
+# ---
+PATH=${PWD%%/test*}/bin:$PATH
+
+# Execute your tests as shell commands below. 
+# An exit code of zero signals success, any other code signals an error
+# and causes this test to fail.
+# See https://github.com/tlevine/urchin.
+
+# Helper function for error reporting.
+die() { (( $# > 0 )) && echo "ERROR: $*" >&2; exit 1; }
+
+dieUnexpected() {
+  cat <<EOF >&2
+ERROR: Unexpected output from \`${cmd[@]}\`:
+  Expected:
+$expectedOutput
+  Actual:
+$output
+  Diff:
+EOF
+  diff <(printf '%s\n' "$expectedOutput") <(printf '%s\n' "$output")
+  exit 1
+}
+
+# Point awf to the test workflows folder.
+export AWF_TEST_WFSROOTFOLDER='../.fixtures/workflows'
+
+# ----
+echo "Get true-case bundle ID by case-variant bundle ID..."
+
+cmd=( awf id 'Net.Same2u.StringLength.Awf' )
+output=$( "${cmd[@]}" )
+expectedOutput=$( cat <<EOF 
+net.same2u.stringlength.awf
+EOF
+)
+[[ "$output" == "$expectedOutput" ]] || dieUnexpected
+
+# ----
+echo "Get bundle ID by folder path..."
+
+cmd=( awf id '../.fixtures/workflows/user.workflow.BCCAF73E-EF0D-411E-A304-5A928C43C2BF' )
+output=$( "${cmd[@]}" )
+expectedOutput=$( cat <<EOF 
+net.same2u.stringlength.awf
+EOF
+)
+[[ "$output" == "$expectedOutput" ]] || dieUnexpected
+
+# ----
+echo "Get empty (missing) bundle ID by folder path..."
+
+cmd=( awf id '../.fixtures/workflows/user.workflow.B3C6CFEC-BEF0-446A-9AE3-BD61D84A27E0' )
+output=$( "${cmd[@]}" ) || die "Failed unexpectedly: \`${cmd[@]}\`"
+expectedOutput=$( cat <<EOF 
+EOF
+)
+[[ "$output" == "$expectedOutput" ]] || dieUnexpected

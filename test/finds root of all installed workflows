@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+# ---
+# IMPORTANT: Use the following statement at the TOP OF EVERY TEST SCRIPT
+#            to ensure that this package's 'bin/' subfolder is added to the path so that
+#            this package's CLIs can be invoked by their mere filename in the rest
+#            of the script.
+# ---
+PATH=${PWD%%/test*}/bin:$PATH
+
+# Helper function for error reporting.
+die() { (( $# > 0 )) && echo "ERROR: $*" >&2; exit 1; }
+
+exists() {
+  [[ -d "$1" || -L "$1" ]]
+}
+
+# NOTE: Unlike with the other tests, we do use Alfred's actual folder containing
+#       the installed workflows here, as a sanity check that awf finds the
+#       true location (in the other tests, this location is overriden with
+#       a test location).
+
+wfRootDir=$(awf which '/') || die "Failed to determine Alfred 2's root folder of all installed workflows."
+
+exists "$wfRootDir/user.workflow."* || die "No workflows found in '$wfRootDir'"
+
+exit 0

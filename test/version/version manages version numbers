@@ -1,0 +1,155 @@
+#!/usr/bin/env bash
+
+# ---
+# IMPORTANT: Use the following statement at the TOP OF EVERY TEST SCRIPT
+#            to ensure that this package's 'bin/' subfolder is added to the path so that
+#            this package's CLIs can be invoked by their mere filename in the rest
+#            of the script.
+# ---
+PATH=${PWD%%/test*}/bin:$PATH
+
+# Execute your tests as shell commands below. 
+# An exit code of zero signals success, any other code signals an error
+# and causes this test to fail.
+# See https://github.com/tlevine/urchin.
+
+# Helper function for error reporting.
+die() { (( $# > 0 )) && echo "ERROR: $*" >&2; exit 1; }
+
+assertExpectedOutput() {
+  [[ "$output" == "$expectedOutput" ]] || dieUnexpectedOutput
+}
+
+dieUnexpected() {
+  die "\`${cmd[@]}\` failed unexpectedly."
+}
+
+
+dieUnexpectedOutput() {
+  cat <<EOF >&2
+ERROR: Unexpected output from \`${cmd[@]}\`:
+  Expected:
+$expectedOutput
+  Actual:
+$output
+EOF
+  exit 1
+}
+
+
+# -------
+
+# Point awf to the test workflows folder created by ../setup_dir
+kTEMP_DIR_PATH="$(< '../_tmp_tmpdirpath')"
+export AWF_TEST_WFSROOTFOLDER="$kTEMP_DIR_PATH/workflows"
+
+[[ -d $kTEMP_DIR_PATH ]] || die "Test setup failure: Temp. folder created by ../setup_dir unexpectedly not found: $kTEMP_DIR_PATH"
+
+wfFolder="${AWF_TEST_WFSROOTFOLDER}/user.workflow.BD68EAC6-EA5A-479A-93F7-950D539603C2"
+
+# ---
+echo "-- Getting version number with path..."
+cmd=( awf version '' "$wfFolder" )
+expectedOutput='0.1.2'
+output=$( "${cmd[@]}" ) || dieUnexpected
+assertExpectedOutput
+
+# For simplicity perform the remaining commands from within the workflow folder.
+cd "$wfFolder" || die
+
+
+
+# ---
+echo "-- Getting version number without path..."
+cmd=( awf version )
+expectedOutput='0.1.2'
+output=$( "${cmd[@]}" ) || dieUnexpected
+assertExpectedOutput
+
+
+echo "-- Incrementing patch component..."
+cmd=( awf version patch )
+expectedOutput='0.1.3'
+"${cmd[@]}" || dieUnexpected
+output=$(< ./version )
+assertExpectedOutput
+
+echo "-- Incrementing minor component..."
+cmd=( awf version minor )
+expectedOutput='0.2.0'
+"${cmd[@]}" || dieUnexpected
+output=$(< ./version )
+assertExpectedOutput
+
+echo "-- Incrementing major component..."
+cmd=( awf version major )
+expectedOutput='1.0.0'
+"${cmd[@]}" || dieUnexpected
+output=$(< ./version )
+assertExpectedOutput
+
+echo "-- Setting explicit version..."
+cmd=( awf version 2.3.4 )
+expectedOutput='2.3.4'
+"${cmd[@]}" || dieUnexpected
+output=$(< ./version )
+assertExpectedOutput
+
+echo "-- Forcing update to LOWER version..."
+cmd=( awf version -f 2.3.3 )
+expectedOutput='2.3.3'
+"${cmd[@]}" || dieUnexpected
+output=$(< ./version )
+assertExpectedOutput
+
+echo "-- Forcing update FROM invalid version number..."
+cp ./version ./version.org
+echo 'not-a-version-number' > ./version
+cmd=( awf version -f 2.3.5 )
+expectedOutput='2.3.5'
+"${cmd[@]}" || dieUnexpected
+output=$(< ./version )
+assertExpectedOutput
+mv ./version.org ./version
+
+
+echo "-- Forcing update TO invalid version number..."
+cp ./version ./version.org
+cmd=( awf version -f 'not-a-version-number' )
+expectedOutput='not-a-version-number'
+"${cmd[@]}" || dieUnexpected
+output=$(< ./version )
+assertExpectedOutput
+mv ./version.org ./version
+
+
+# ---------- NEGATIVE TESTS
+
+# ---
+echo "-- Getting version number from a non-workflow folder should fail..."
+cmd=( awf version '' /Library )
+"${cmd[@]}" && die "Obtaining version number from non-workflow folder succeeded unexpectedly."
+
+
+# ---
+echo "-- Attempting to set invalid version number should fail..."
+cmd=( awf version 'not-a-version-number' )
+"${cmd[@]}" && die "Setting an invalid version number succeeded unexpectedly."
+
+# ---
+echo "-- Attempting to get version number without a 'version' file present should fail..."
+mv version version1
+cmd=( awf version )
+"${cmd[@]}" && die "Getting a nonexistent version number succeeded unexpectedly."
+mv version1 version
+
+# ---
+echo "-- Attempt to increment an currently invalid version number should fail..."
+cp ./version ./version.org
+echo 'not-a-version-number' > ./version
+cmd=( awf version patch )
+"${cmd[@]}" && die "Icrementing an invalid version number succeeded unexpectedly."
+mv ./version.org ./version
+
+
+exit 0

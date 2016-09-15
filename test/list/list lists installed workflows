@@ -1,0 +1,141 @@
+#!/usr/bin/env bash
+
+# ---
+# IMPORTANT: Use the following statement at the TOP OF EVERY TEST SCRIPT
+#            to ensure that this package's 'bin/' subfolder is added to the path so that
+#            this package's CLIs can be invoked by their mere filename in the rest
+#            of the script.
+# ---
+PATH=${PWD%%/test*}/bin:$PATH
+
+# Execute your tests as shell commands below. 
+# An exit code of zero signals success, any other code signals an error
+# and causes this test to fail.
+# See https://github.com/tlevine/urchin.
+
+# Helper function for error reporting.
+die() { (( $# > 0 )) && echo "ERROR: $*" >&2; exit 1; }
+
+dieUnexpected() {
+  cat <<EOF >&2
+ERROR: Unexpected output from \`${cmd[@]}\`:
+  Expected:
+$expectedOutput
+  Actual:
+$output
+  Diff:
+EOF
+  diff <(printf '%s\n' "$expectedOutput") <(printf '%s\n' "$output")
+  exit 1
+}
+
+# Point awf to the test workflows folder.
+export AWF_TEST_WFSROOTFOLDER='../.fixtures/workflows'
+
+# Helper var for representing tab-separated output.
+tab=$'\t'
+
+# ----
+echo "Default list output, with header, space-separated, aligned..."
+
+cmd=( awf list )
+output=$( "${cmd[@]}" )
+expectedOutput=$( cat <<EOF 
+name                                                             bundleid                                            category
+----                                                             --------                                            --------
+App: ST - Sublime Text                                                                                               Tools
+Playground                                                       org.example.dummy                                   
+String (Text) Length                                             net.same2u.stringlength.awf                         Productivity
+EOF
+)
+[[ "$output" == "$expectedOutput" ]] || dieUnexpected
+
+# ----
+echo "List output without header, tab-separated..."
+
+cmd=( awf list -b )
+output=$( "${cmd[@]}" )
+expectedOutput=$( cat <<EOF 
+App: ST - Sublime Text${tab}${tab}Tools
+Playground${tab}org.example.dummy${tab}
+String (Text) Length${tab}net.same2u.stringlength.awf${tab}Productivity
+EOF
+)
+[[ "$output" == "$expectedOutput" ]] || dieUnexpected
+
+# ---
+echo "List output with explicit selection of output fields..."
+
+cmd=( awf list -b -o plaindcbwr )
+output=$( "${cmd[@]}" )
+expectedOutput=$( cat <<EOF 
+../.fixtures/workflows/user.workflow.B3C6CFEC-BEF0-446A-9AE3-BD61D84A27E0${tab}${tab}false${tab}${tab}App: ST - Sublime Text${tab}${tab}Tools${tab}${tab}${tab}
+../.fixtures/workflows/user.workflow.BCCAF73E-EF0D-411E-A304-5A928C43C2BF${tab}${tab}false${tab}net.same2u.stringlength.awf${tab}String (Text) Length${tab}Calculates the length of the specified string (text) in both characters and bytes.${tab}Productivity${tab}Michael Klement${tab}http://same2u.net${tab}
+../.fixtures/workflows/user.workflow.BD68EAC6-EA5A-479A-93F7-950D539603C2${tab}${tab}false${tab}org.example.dummy${tab}Playground${tab}For playing with workflow definitions${tab}${tab}Michael Klement <mklement0@gmail.com>${tab}https://github.com/mklement0/pg${tab}Read-me line 1.\nRead-me line 2.
+EOF
+)
+[[ "$output" == "$expectedOutput" ]] || dieUnexpected
+
+##
+# NOTE: ALL awf search features are case-INsensitive by design.
+##
+
+# ----
+echo "Search by workflow name substring..."
+
+cmd=( awf list -b -o p 'sublime' )
+output=$( "${cmd[@]}" )
+expectedOutput=$( cat <<EOF 
+../.fixtures/workflows/user.workflow.B3C6CFEC-BEF0-446A-9AE3-BD61D84A27E0
+EOF
+)
+[[ "$output" == "$expectedOutput" ]] || dieUnexpected
+
+# ----
+echo "Search by bundle ID substring..."
+
+cmd=( awf list -b -o p -s i 'net.same2u' )
+output=$( "${cmd[@]}" )
+expectedOutput=$( cat <<EOF
+../.fixtures/workflows/user.workflow.BCCAF73E-EF0D-411E-A304-5A928C43C2BF
+EOF
+)
+[[ "$output" == "$expectedOutput" ]] || dieUnexpected
+
+# ----
+echo "Search in multiple fields..."
+
+cmd=( awf list -b -o p -s wr 'read-me' )
+output=$( "${cmd[@]}" )
+expectedOutput=$( cat <<EOF
+../.fixtures/workflows/user.workflow.BD68EAC6-EA5A-479A-93F7-950D539603C2
+EOF
+)
+[[ "$output" == "$expectedOutput" ]] || dieUnexpected
+
+# ----
+echo "Search by exact field value..."
+
+cmd=( awf list -b -o p -s i -x 'Net.Same2u.Stringlength.Awf' )
+output=$( "${cmd[@]}" )
+expectedOutput=$( cat <<EOF 
+../.fixtures/workflows/user.workflow.BCCAF73E-EF0D-411E-A304-5A928C43C2BF
+EOF
+)
+# Counter-test: should fail with an incomplete value
+cmd=( awf list -b -o p -s i -x 'net.same2u.stringlength.aw' )
+"${cmd[@]}" && die "Succeeded unexpectedly: \`${cmd[@]}\`."
+[[ "$output" == "$expectedOutput" ]] || dieUnexpected
+
+
+# ----
+echo "Search by regex..."
+
+cmd=( awf list -b -o p -r -s i '^Net\.Same2u\..+' )
+output=$( "${cmd[@]}" )
+expectedOutput=$( cat <<EOF 
+../.fixtures/workflows/user.workflow.BCCAF73E-EF0D-411E-A304-5A928C43C2BF
+EOF
+)
+[[ "$output" == "$expectedOutput" ]] || dieUnexpected
+

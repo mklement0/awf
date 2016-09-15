@@ -1,0 +1,12 @@
+#!/bin/sh
+
+# Helper function for error reporting.
+die() { [ $# -gt 0 ] && echo "ERROR: $*" >&2; exit 1; }
+
+# Make sure that we're running on OS X.
+[ "$(uname)" = 'Darwin' ] || die "FAILED TEST PREREQUISITE: Can only run on OSX."
+
+# Make sure that Alfred 2 is installed
+osascript -e 'tell application "Alfred 2" to id' >/dev/null || die "FAILED TEST PREREQUISITE: Alfred 2 must be installed."
+
+exit 0

@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+
+# ---
+# IMPORTANT: Use the following statement at the TOP OF EVERY TEST SCRIPT
+#            to ensure that this package's 'bin/' subfolder is added to the path so that
+#            this package's CLIs can be invoked by their mere filename in the rest
+#            of the script.
+# ---
+PATH=${PWD%%/test*}/bin:$PATH
+
+# Helper function for error reporting.
+die() { (( $# > 0 )) && echo "ERROR: $*" >&2; exit 1; }
+
+dieUnexpectedOutput() {
+  cat <<EOF >&2
+ERROR: Unexpected output from \`${cmd[@]}\`:
+  Expected:
+$expectedOutput
+  Actual:
+$output
+  Diff:
+EOF
+  diff <(printf '%s\n' "$expectedOutput") <(printf '%s\n' "$output")
+  exit 1
+}
+
+# Point awf to the test workflows folder created in ../setup_dir
+kTEMP_DIR_PATH="$(< '../_tmp_tmpdirpath')"
+export AWF_TEST_WFSROOTFOLDER="$kTEMP_DIR_PATH/workflows"
+
+[[ -d $kTEMP_DIR_PATH ]] || die "Test setup failure: Temp. folder created by ../setup_dir unexpectedly not found: $kTEMP_DIR_PATH"
+
+# ----
+echo "Get installed workflow folder path by bundle ID..."
+
+bundleid='net.same2u.stringlength.awf'
+cmd=( awf which "$bundleid" )
+output=$( "${cmd[@]}" )
+# Save this path for the next step.
+wfFolder=$output 
+expectedOutput=$( cat <<EOF 
+$kTEMP_DIR_PATH/workflows/user.workflow.BCCAF73E-EF0D-411E-A304-5A928C43C2BF
+EOF
+)
+[[ "$output" == "$expectedOutput" ]] || dieUnexpectedOutput
+
+# -- Clone the workflow found above, so we can apply `todev` to it
+wfFolderClone="${wfFolder}.clone"
+bundleidClone="${bundleid}.clone"
+rm -rf "$wfFolderClone"
+cp -a "$wfFolder" "$wfFolderClone" || die "Failed to clone folder '$wfFolder' to '$wfFolderClone'"
+# Assign a unique bundle ID.
+/usr/libexec/PlistBuddy -c "set :bundleid ${bundleidClone}" "$wfFolderClone/info.plist" || die "Failed to update the bundle ID in: $wfFolderClone/info.plist" 
+devWfFolderName='StringLengthClone.awf'
+devWfFolder="$kTEMP_DIR_PATH/dev/$devWfFolderName"
+rm -rf "$devWfFolder"
+# The full path of the symlink that will be created when applying `awf todev` below.
+wfSymlinkToDevFolder="${kTEMP_DIR_PATH}/workflows/dev.workflow.${devWfFolderName}"
+rm -f "$wfSymlinkToDevFolder"
+awf todev "$wfFolderClone" "$devWfFolder" || die "Failed to convert workflow '$wfFolder' to a dev workflow in '$devWfFolder'"
+
+# ----
+echo "Get folder path of installed workflow with underlying dev folder by bundle ID..."
+
+cmd=( awf which "${bundleidClone}" )
+output=$( "${cmd[@]}" )
+expectedOutput=$( cat <<EOF 
+$wfSymlinkToDevFolder
+EOF
+)
+[[ "$output" == "$expectedOutput" ]] || dieUnexpectedOutput
+
+# ----
+echo "Get folder path of underlying dev folder ONLY..."
+
+cmd=( awf which -P "${bundleidClone}" )
+output=$( "${cmd[@]}" )
+# !! -P resolves /var/... to /private/var..., because /var is a symlink to /private/var.
+expectedOutput=$( cat <<EOF 
+/private${devWfFolder}
+EOF
+)
+[[ "$output" == "$expectedOutput" ]] || dieUnexpectedOutput
+
+
+# ----
+echo "Get folder path of installed workflow AND underlying dev folder by bundle ID..."
+
+cmd=( awf which -l "${bundleidClone}" )
+output=$( "${cmd[@]}" )
+# !! -l resolves /var/... to /private/var..., because /var is a symlink to /private/var
+expectedOutput=$( cat <<EOF 
+${wfSymlinkToDevFolder}@ -> /private${devWfFolder}
+EOF
+)
+[[ "$output" == "$expectedOutput" ]] || dieUnexpectedOutput

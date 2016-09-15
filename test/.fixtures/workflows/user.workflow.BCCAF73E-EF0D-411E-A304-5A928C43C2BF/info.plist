@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>bundleid</key>
+	<string>net.same2u.stringlength.awf</string>
+	<key>category</key>
+	<string>Productivity</string>
+	<key>connections</key>
+	<dict>
+		<key>8D8F7A4D-06DA-473A-9142-D2E4192EE31A</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>27A1BA95-8EE9-4FFF-AFA3-87175EBA9952</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+			</dict>
+			<dict>
+				<key>destinationuid</key>
+				<string>B1D7CAA5-A566-412F-BB0A-BF1CBD257FB9</string>
+				<key>modifiers</key>
+				<integer>524288</integer>
+				<key>modifiersubtext</key>
+				<string>PASTE into frontmost app (via clipboard)</string>
+			</dict>
+		</array>
+		<key>C6B9B25E-20F3-44E3-856C-747B7319B9BA</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>8D8F7A4D-06DA-473A-9142-D2E4192EE31A</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+			</dict>
+		</array>
+	</dict>
+	<key>createdby</key>
+	<string>Michael Klement</string>
+	<key>description</key>
+	<string>Calculates the length of the specified string (text) in both characters and bytes.</string>
+	<key>disabled</key>
+	<false/>
+	<key>name</key>
+	<string>String (Text) Length</string>
+	<key>objects</key>
+	<array>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>autopaste</key>
+				<false/>
+				<key>clipboardtext</key>
+				<string>{query}</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.clipboard</string>
+			<key>uid</key>
+			<string>27A1BA95-8EE9-4FFF-AFA3-87175EBA9952</string>
+			<key>version</key>
+			<integer>0</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>0</integer>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>keyword</key>
+				<string>l</string>
+				<key>runningsubtext</key>
+				<string>Counting...</string>
+				<key>script</key>
+				<string># Workaround: Set the locale properly.
+export LANG="$(defaults read -g AppleLocale).UTF-8" 
+
+# Workaround: Recompose the decomposed Unicode string that Alfred passes:
+txt=$(./normalise "{query}")
+
+# Count the characters and bytes (must be separate statements).
+# Note that output will have (a) leading whitespace, and (b) count 1 extra char/byte, because `&lt;&lt;&lt;` appends a newline.
+charCount=$(wc &lt;&lt;&lt;"$txt" -m)
+byteCount=$(wc &lt;&lt;&lt;"$txt" -c)
+
+# We subtract 1 for the newline added by `&lt;&lt;&lt;`
+# Conveniently, by treating the variables as numbers and performing an operation on them, the leading whitespace is removed.
+(( --charCount ))
+(( --byteCount ))
+
+endingChars='s'
+(( charCount == 1 )) &amp;&amp; endingChars=''
+
+endingBytes='s'
+(( byteCount == 1 )) &amp;&amp; endingBytes=''
+
+hint='↩ to copy number to clipboard; plus ⌥ to paste, too.'
+
+# Template for output from a script filter for an  Alfred worklow.
+# Use a 'uid' attribute on each &lt;item&gt; to make alfred learn the most frequently used item; omit the attribute for invariant item ordering.
+# Use an 'arg' attribute on each item to determine the item's output (to the next workflow step) on being actioned.
+cat &lt;&lt;EOF
+&lt;?xml version="1.0"?&gt;
+&lt;items&gt;
+
+  &lt;item arg="$charCount"&gt;
+    &lt;title&gt;$charCount character${endingChars}&lt;/title&gt;
+    &lt;subtitle&gt;$hint&lt;/subtitle&gt;
+  &lt;/item&gt;
+
+  &lt;item arg="$byteCount"&gt;
+    &lt;title&gt;$byteCount byte${endingBytes} (UTF-8)&lt;/title&gt;
+    &lt;subtitle&gt;$hint&lt;/subtitle&gt;
+  &lt;/item&gt;
+
+&lt;/items&gt;
+EOF
+</string>
+				<key>subtext</key>
+				<string>Type or paste text.</string>
+				<key>title</key>
+				<string>Calculates string length.</string>
+				<key>type</key>
+				<integer>0</integer>
+				<key>withspace</key>
+				<true/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.scriptfilter</string>
+			<key>uid</key>
+			<string>8D8F7A4D-06DA-473A-9142-D2E4192EE31A</string>
+			<key>version</key>
+			<integer>0</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>action</key>
+				<integer>0</integer>
+				<key>argument</key>
+				<integer>1</integer>
+				<key>hotkey</key>
+				<integer>37</integer>
+				<key>hotmod</key>
+				<integer>1703936</integer>
+				<key>hotstring</key>
+				<string>L</string>
+				<key>leftcursor</key>
+				<false/>
+				<key>modsmode</key>
+				<integer>0</integer>
+				<key>relatedAppsMode</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.hotkey</string>
+			<key>uid</key>
+			<string>C6B9B25E-20F3-44E3-856C-747B7319B9BA</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>autopaste</key>
+				<true/>
+				<key>clipboardtext</key>
+				<string>{query}</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.clipboard</string>
+			<key>uid</key>
+			<string>B1D7CAA5-A566-412F-BB0A-BF1CBD257FB9</string>
+			<key>version</key>
+			<integer>0</integer>
+		</dict>
+	</array>
+	<key>readme</key>
+	<string></string>
+	<key>uidata</key>
+	<dict>
+		<key>27A1BA95-8EE9-4FFF-AFA3-87175EBA9952</key>
+		<dict>
+			<key>ypos</key>
+			<real>10</real>
+		</dict>
+		<key>8D8F7A4D-06DA-473A-9142-D2E4192EE31A</key>
+		<dict>
+			<key>ypos</key>
+			<real>10</real>
+		</dict>
+		<key>B1D7CAA5-A566-412F-BB0A-BF1CBD257FB9</key>
+		<dict>
+			<key>ypos</key>
+			<real>130</real>
+		</dict>
+		<key>C6B9B25E-20F3-44E3-856C-747B7319B9BA</key>
+		<dict>
+			<key>ypos</key>
+			<real>10</real>
+		</dict>
+	</dict>
+	<key>webaddress</key>
+	<string>http://same2u.net</string>
+</dict>
+</plist>

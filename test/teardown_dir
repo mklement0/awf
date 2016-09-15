@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+# Read path of temp. dir created by `setup`.
+kTEMP_DIR_PATH_FILE='_tmp_tmpdirpath'
+tmpDir=$(< "$kTEMP_DIR_PATH_FILE")
+
+# Remove temp. dir.
+rm -rf "$tmpDir"
+
+rm "$kTEMP_DIR_PATH_FILE"
+
+exit 0
