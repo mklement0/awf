@@ -5,7 +5,9 @@ SHELL := bash
 	# Add the local npm packages' bin folder to the PATH, so that `make` can find them even when invoked directly (not via npm).
 	# !! Note that this extended path only takes effect in (a) recipe commands that are (b) true shell commands (not optimized away) - when in doubt, simply append ';'
 	# !! To also use the extended path in $(shell ...) function calls, use $(shell PATH="$(PATH)" ...),
-export PATH := $(PWD)/node_modules/.bin:$(PATH)
+	# !! ALSO: WE use "./" rather than "$(PWD)/" to add the path, because if you use PowerShell Core as your shell, $PWD will not be defined as an *environment* variable.
+	# !!       "./" (appending a *relative* path) is safe in this case, because we've ensured above that we're running from the project directory.
+export PATH := ./node_modules/.bin:$(PATH)
 	# Sanity check: git repo must exist.
 $(if $(shell [[ -d .git ]] && echo ok),,$(error No git repo found in current dir. Please at least initialize one with 'git init'))
 	# Sanity check: make sure dev dependencies (and npm) are installed - skip this check only for certain generic targets (':' is the pseudo target used by the `list` target's recipe.)
@@ -269,7 +271,7 @@ update-license-year:
 #    To change this, modify CLI_HELP_CMD in the shell command below.
 .PHONY: _update-readme-usage
 # The arguments to pass to the CLI to have it output its help.
-CLI_HELP_ARGS:= help all 	# !! Note that this value is SPECIFIC TO THIS PROJECT and MUST BE RESTORED AFTER UPDATING THIS MAKEFILE from the generic version maintained as part of `make-pkg`; typically, it's just `--help` 
+CLI_HELP_ARGS:= --help
 # Note that the recipe exits right away if no CLIs are found in 'package.json'.
 # TO DISABLE THIS RULE, REMOVE ALL OF ITS RECIPE LINES.
 _update-readme-usage:
